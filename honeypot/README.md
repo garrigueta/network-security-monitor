@@ -1,39 +1,24 @@
-# Honeypot Deployment - Second Raspberry Pi
+# Honeypot Stack - Setup Guide
 
-Complete honeypot setup for network security monitoring and threat intelligence gathering.
+Deploy honeypots on a second Raspberry Pi to capture attack data and malware samples.
 
-**Note**: This is for deploying on your **second Raspberry Pi device** (not the Raspberry Pi 2 model). Any Raspberry Pi 3B+, 4, or 5 is recommended for better performance.
+> **📖 Main Docs**: [../README.md](../README.md) | **Monitoring Stack**: [../monitoring/README.md](../monitoring/README.md)
 
-## Overview
+## Services
 
-This honeypot deployment includes:
-- **Cowrie**: SSH/Telnet honeypot for capturing brute-force attacks and commands
-- **Dionaea**: Malware collection honeypot (FTP, SMB, MySQL, MSSQL, SIP)
-- **HoneyTrap**: Network service emulation
-- **Promtail**: Ships logs to central Loki instance
-- **Node Exporter**: System metrics
+- **Cowrie** - SSH/Telnet honeypot (captures brute-force, commands, malware)
+- **Dionaea** - Malware collection (FTP, SMB, MySQL, MSSQL, SIP)
+- **HoneyTrap** - Network service emulation
+- **Promtail** - Ships logs to main Loki instance
 
-## Prerequisites
+## Requirements
 
-- Raspberry Pi 3B+, 4, or 5 (second device for honeypot)
+- Second Raspberry Pi (3B+, 4, or 5 recommended)
 - Docker Engine 20.10+
 - Docker Compose 2.0+
-- Network connectivity to main monitoring server (RPi1)
-- Minimum 2GB RAM
-- Minimum 16GB SD card
-
-## Network Architecture
-
-```
-Internet
-   │
-   ├──> Honeypot Pi (2nd device)  Main Monitoring Pi (1st device)
-   │    ├─ Cowrie (SSH:22)        ├─ Loki
-   │    ├─ Dionaea (SMB:445)      ├─ Prometheus  
-   │    ├─ HoneyTrap              ├─ Grafana
-   │    └─ Promtail ──────────────┘
-   │
-```
+- Main monitoring stack running
+- 2GB RAM minimum
+- 16GB+ SD card
 
 ## Quick Start
 
