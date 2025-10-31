@@ -1,0 +1,21 @@
+# Environment files
+.env
+
+# Logs
+*.log
+
+# Backups
+backups/
+
+# Malware samples
+malware-samples/
+downloads/
+binaries/
+
+# Docker
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+*~

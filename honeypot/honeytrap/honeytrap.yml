@@ -1,0 +1,33 @@
+services:
+  - type: ssh
+    port: 22
+    credentials:
+      - username: root
+        password: root
+      - username: admin
+        password: admin
+      - username: user
+        password: password
+
+  - type: telnet
+    port: 23
+    credentials:
+      - username: admin
+        password: admin
+
+  - type: http
+    port: 80
+
+  - type: https
+    port: 443
+
+  - type: ftp
+    port: 21
+
+listeners:
+  - type: socket
+    address: 0.0.0.0:5000
+
+logging:
+  level: info
+  filename: /var/log/honeytrap/honeytrap.log
