@@ -1,0 +1,28 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /var/lib/promtail/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Zeek logs from current directory
+  - job_name: zeek_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: zeek
+          __path__: /mnt/zeek-logs/logs/current/*.log
+
+  # Zeek spool logs
+  - job_name: zeek_spool
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: zeek
+          __path__: /mnt/zeek-logs/spool/zeek/*.log

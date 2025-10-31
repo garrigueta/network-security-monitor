@@ -1,0 +1,15 @@
+# Docker build artifacts
+docker/*/Dockerfile
+**/__pycache__/
+**/*.pyc
+
+# Environment files
+.env
+
+# Backup files
+backups/
+*.tar.gz
+
+# Volume data (if mounted locally)
+data/
+logs/

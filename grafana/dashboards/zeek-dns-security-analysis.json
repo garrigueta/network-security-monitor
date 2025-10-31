@@ -1,0 +1,169 @@
+{
+  "id": 11,
+  "panels": [
+    {
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*dns.log\"}[10m]))",
+          "legendFormat": "DNS Queries (10m)",
+          "refId": "A"
+        }
+      ],
+      "title": "Total DNS Queries",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*dns.log\"} |~ \"NXDOMAIN|SERVFAIL|REFUSED\"[10m]))",
+          "legendFormat": "Failed Queries (10m)",
+          "refId": "A"
+        }
+      ],
+      "title": "Failed DNS Queries",
+      "type": "stat"
+    },
+    {
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*dns.log\"} |~ \"8.8.8.8|1.1.1.1|208.67\"[10m]))",
+          "legendFormat": "External DNS (10m)",
+          "refId": "A"
+        }
+      ],
+      "title": "External DNS Queries",
+      "type": "stat"
+    },
+    {
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*dns.log\"} |~ \"microsoft.com|google.com|amazon.com|facebook.com\"[10m]))",
+          "legendFormat": "Popular Domains (10m)",
+          "refId": "A"
+        }
+      ],
+      "title": "Popular Domains",
+      "type": "stat"
+    },
+    {
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "id": 5,
+      "options": {
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "expr": "{job=\"zeek\", filename=~\".*dns.log\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent DNS Queries",
+      "type": "logs"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineInterpolation": "linear",
+            "pointSize": 3
+          },
+          "unit": "qpm"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 6,
+      "targets": [
+        {
+          "expr": "sum by() (count_over_time({job=\"zeek\", filename=~\".*dns.log\"}[1m]))",
+          "legendFormat": "Queries/minute",
+          "refId": "A"
+        }
+      ],
+      "title": "DNS Query Timeline",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "style": "dark",
+  "tags": [
+    "zeek",
+    "dns",
+    "security"
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Zeek DNS Security Analysis",
+  "uid": "df2glhb1o7klce",
+  "version": 2
+}
