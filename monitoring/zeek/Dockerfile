@@ -64,4 +64,3 @@ WORKDIR /usr/local/zeek
 USER zeek
 
 ENTRYPOINT ["/entrypoint.sh"]
-git config --global user.email "ferran.garriga@github.com" && git config --global user.name "garrigueta"
