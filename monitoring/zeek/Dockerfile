@@ -39,9 +39,16 @@ ENV PATH="/usr/local/zeek/bin:${PATH}"
 # Create necessary directories
 RUN mkdir -p /mnt/zeek-logs/logs /mnt/zeek-logs/spool
 
+# Create zeek user matching host UID/GID (1000:1000)
+RUN groupadd -g 1000 zeek && \
+    useradd -u 1000 -g 1000 -m zeek
+
 # Configure zeekctl
 RUN echo "LogDir = /mnt/zeek-logs/logs" >> /usr/local/zeek/etc/zeekctl.cfg && \
     echo "SpoolDir = /mnt/zeek-logs/spool" >> /usr/local/zeek/etc/zeekctl.cfg
+
+# Set ownership of zeek directories
+RUN chown -R zeek:zeek /usr/local/zeek /mnt/zeek-logs
 
 # Copy startup script
 COPY entrypoint.sh /entrypoint.sh
@@ -53,4 +60,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 WORKDIR /usr/local/zeek
 
+# Switch to zeek user
+USER zeek
+
 ENTRYPOINT ["/entrypoint.sh"]
+git config --global user.email "ferran.garriga@github.com" && git config --global user.name "garrigueta"

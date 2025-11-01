@@ -17,6 +17,13 @@ if [ ! -d "/mnt/zeek-logs/spool" ]; then
     mkdir -p /mnt/zeek-logs/spool
 fi
 
+# Ensure we have write permissions
+if [ ! -w "/mnt/zeek-logs/spool" ]; then
+    echo "Error: No write permission to /mnt/zeek-logs/spool"
+    echo "Please ensure the host directory is owned by UID 1000 (zeek user)"
+    exit 1
+fi
+
 # Configure zeekctl to not send mail (we don't have sendmail)
 echo "MailTo = " >> /usr/local/zeek/etc/zeekctl.cfg
 echo "SendMail = " >> /usr/local/zeek/etc/zeekctl.cfg
