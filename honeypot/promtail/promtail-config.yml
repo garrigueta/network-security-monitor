@@ -6,71 +6,25 @@ positions:
   filename: /var/lib/promtail/positions.yaml
 
 clients:
-  - url: ${LOKI_URL}/loki/api/v1/push
+  - url: http://192.168.1.135:3100/loki/api/v1/push
 
 scrape_configs:
   # Cowrie SSH/Telnet honeypot logs
-  - job_name: cowrie
+  - job_name: honeypot-cowrie
     static_configs:
       - targets:
           - localhost
         labels:
           job: honeypot
-          honeypot_type: cowrie
-          service: ssh-telnet
+          service: cowrie
           __path__: /var/log/cowrie/*.log
+
+  # Cowrie JSON logs  
+  - job_name: honeypot-cowrie-json
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: honeypot
+          service: cowrie
           __path__: /var/log/cowrie/*.json
-
-  # Dionaea malware honeypot logs
-  - job_name: dionaea
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: honeypot
-          honeypot_type: dionaea
-          service: malware
-          __path__: /var/log/dionaea/**/*.log
-
-  # HoneyTrap network service logs
-  - job_name: honeytrap
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: honeypot
-          honeypot_type: honeytrap
-          service: network
-          __path__: /var/log/honeytrap/*.log
-
-pipeline_stages:
-  # Parse JSON logs from Cowrie
-  - match:
-      selector: '{honeypot_type="cowrie"}'
-      stages:
-        - json:
-            expressions:
-              timestamp: eventid
-              session: session
-              username: username
-              password: password
-              src_ip: src_ip
-              message: message
-        - labels:
-            username:
-            src_ip:
-        - timestamp:
-            source: timestamp
-            format: RFC3339
-
-  # Parse Dionaea logs
-  - match:
-      selector: '{honeypot_type="dionaea"}'
-      stages:
-        - regex:
-            expression: '(?P<timestamp>\S+\s+\S+)\s+(?P<level>\S+)\s+(?P<message>.*)'
-        - labels:
-            level:
-        - timestamp:
-            source: timestamp
-            format: '2006-01-02 15:04:05'

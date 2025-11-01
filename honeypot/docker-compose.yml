@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Cowrie SSH/Telnet Honeypot
   cowrie:
@@ -87,7 +85,7 @@ services:
       - /sys:/host/sys:ro
       - /:/rootfs:ro
     ports:
-      - "9100:9100"
+      - "9102:9100"
     networks:
       - honeypot
     restart: unless-stopped
