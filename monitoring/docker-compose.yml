@@ -96,6 +96,8 @@ services:
     environment:
       - ZEEK_INTERFACE=eth1
     restart: unless-stopped
+    depends_on:
+      - loki
 
   # Grafana - Visualization
   grafana:

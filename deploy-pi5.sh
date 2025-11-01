@@ -99,7 +99,7 @@ sudo mkdir -p /mnt/ssd-logs/{zeek-logs/logs,zeek-logs/spool,prometheus-data,loki
 sudo chown -R 472:472 /mnt/ssd-logs/grafana-data      # Grafana
 sudo chown -R 65534:65534 /mnt/ssd-logs/prometheus-data # Prometheus  
 sudo chown -R 10001:10001 /mnt/ssd-logs/loki-data     # Loki
-sudo chown -R $USER:$USER /mnt/ssd-logs/zeek-logs     # Zeek
+sudo chown -R $USER:$USER /mnt/ssd-logs/zeek-logs     # Zeek (including logs and spool subdirs)
 sudo chown -R $USER:$USER /mnt/ssd-logs/promtail-positions # Promtail
 
 # Step 4: System update and install packages
