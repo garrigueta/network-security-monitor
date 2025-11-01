@@ -9,20 +9,51 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  # Zeek logs from current directory
-  - job_name: zeek_logs
+  # Zeek connection logs
+  - job_name: zeek_conn
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: zeek
+          log_type: conn
+          __path__: /mnt/zeek-logs/logs/current/conn.log
+
+  # Zeek DNS logs
+  - job_name: zeek_dns
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: zeek
+          log_type: dns
+          __path__: /mnt/zeek-logs/logs/current/dns.log
+
+  # Zeek HTTP logs
+  - job_name: zeek_http
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: zeek
+          log_type: http
+          __path__: /mnt/zeek-logs/logs/current/http.log
+
+  # Zeek SSL logs
+  - job_name: zeek_ssl
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: zeek
+          log_type: ssl
+          __path__: /mnt/zeek-logs/logs/current/ssl.log
+
+  # All Zeek logs (fallback)
+  - job_name: zeek_all
     static_configs:
       - targets:
           - localhost
         labels:
           job: zeek
           __path__: /mnt/zeek-logs/logs/current/*.log
-
-  # Zeek spool logs
-  - job_name: zeek_spool
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: zeek
-          __path__: /mnt/zeek-logs/spool/zeek/*.log

@@ -20,6 +20,19 @@ EOF
 # Start zeek
 /usr/local/zeek/bin/zeekctl start
 
+# Give it a moment to start
+sleep 5
+
+# Check if zeek is running and logs are being generated
+echo "Zeek status:"
+/usr/local/zeek/bin/zeekctl status
+
+echo "Log directory contents:"
+ls -la /mnt/zeek-logs/logs/
+
+echo "Current log directory contents:"
+ls -la /mnt/zeek-logs/logs/current/ || echo "Current directory not yet created"
+
 # Monitor and restart if crashed
 while true; do
     sleep 60
