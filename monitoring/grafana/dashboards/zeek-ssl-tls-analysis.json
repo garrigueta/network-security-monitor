@@ -11,6 +11,10 @@
       "id": 1,
       "targets": [
         {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
           "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*ssl.log\"}[10m]))",
           "legendFormat": "SSL Connections (10m)",
           "refId": "A"
@@ -28,14 +32,26 @@
           "thresholds": {
             "steps": [
               {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
                 "color": "red",
                 "value": null
               },
               {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
                 "color": "yellow",
                 "value": 1
               },
               {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
                 "color": "green",
                 "value": 10
               }
@@ -52,6 +68,10 @@
       "id": 2,
       "targets": [
         {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
           "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*ssl.log\"} |~ \"TLSv1.3\"[10m]))",
           "legendFormat": "TLS 1.3 (10m)",
           "refId": "A"
@@ -69,14 +89,26 @@
           "thresholds": {
             "steps": [
               {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
                 "color": "green",
                 "value": null
               },
               {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
                 "color": "yellow",
                 "value": 1
               },
               {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
                 "color": "red",
                 "value": 5
               }
@@ -93,6 +125,10 @@
       "id": 3,
       "targets": [
         {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
           "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*notice.log\"} |~ \"SSL::Certificate_Expired|SSL::Invalid_Certificate\"[10m]))",
           "legendFormat": "Cert Issues (10m)",
           "refId": "A"
@@ -110,14 +146,26 @@
           "thresholds": {
             "steps": [
               {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
                 "color": "green",
                 "value": null
               },
               {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
                 "color": "yellow",
                 "value": 1
               },
               {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
                 "color": "red",
                 "value": 3
               }
@@ -134,6 +182,10 @@
       "id": 4,
       "targets": [
         {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
           "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*ssl.log\"} |~ \"handshake_failure|certificate_verify_failed\"[10m]))",
           "legendFormat": "SSL Errors (10m)",
           "refId": "A"
@@ -160,6 +212,10 @@
       },
       "targets": [
         {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
           "expr": "{job=\"zeek\", filename=~\".*ssl.log\"}",
           "refId": "A"
         }
@@ -188,6 +244,10 @@
       "id": 6,
       "targets": [
         {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
           "expr": "sum by() (count_over_time({job=\"zeek\", filename=~\".*ssl.log\"}[1m]))",
           "legendFormat": "SSL Connections/minute",
           "refId": "A"

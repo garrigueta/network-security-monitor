@@ -8,6 +8,15 @@ help: ## Show this help message
 	@echo 'Available targets:'
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
+setup: ## Complete setup (start services + fix dashboards)
+	@echo "🚀 Starting monitoring stack..."
+	docker compose up -d
+	@echo "⏳ Waiting for services to initialize..."
+	@sleep 30
+	@echo "🔧 Fixing dashboard configurations..."
+	@./fix-dashboards.sh
+	@echo "✅ Setup complete! Access Grafana at http://localhost:3000"
+
 up: ## Start all services
 	docker compose up -d
 

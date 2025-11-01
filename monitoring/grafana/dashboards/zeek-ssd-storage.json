@@ -85,7 +85,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "count(node_filesystem_size_bytes{mountpoint=\"/mnt/zeek-logs\",fstype!~\"tmpfs|overlay\"}) > 0",
+          "expr": "count(node_filesystem_size_bytes{mountpoint=\"/mnt/ssd-logs\",fstype!~\"tmpfs|overlay\"}) > 0",
           "refId": "A"
         }
       ],
@@ -144,7 +144,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "100 * (1 - node_filesystem_avail_bytes{mountpoint=\"/mnt/zeek-logs\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{mountpoint=\"/mnt/zeek-logs\",fstype!~\"tmpfs|overlay\"})",
+          "expr": "100 * (1 - node_filesystem_avail_bytes{mountpoint=\"/mnt/ssd-logs\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{mountpoint=\"/mnt/ssd-logs\",fstype!~\"tmpfs|overlay\"})",
           "legendFormat": "Usage %",
           "refId": "A"
         }
@@ -205,7 +205,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "avg_over_time((100 * (1 - node_filesystem_avail_bytes{mountpoint=\"/mnt/zeek-logs\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{mountpoint=\"/mnt/zeek-logs\",fstype!~\"tmpfs|overlay\"}))[10m])",
+          "expr": "100 * (1 - node_filesystem_avail_bytes{mountpoint=\"/mnt/ssd-logs\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{mountpoint=\"/mnt/ssd-logs\",fstype!~\"tmpfs|overlay\"})",
           "refId": "A"
         }
       ],
@@ -265,7 +265,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "node_filesystem_avail_bytes{mountpoint=\"/mnt/zeek-logs\",fstype!~\"tmpfs|overlay\"}",
+          "expr": "node_filesystem_avail_bytes{mountpoint=\"/mnt/ssd-logs\",fstype!~\"tmpfs|overlay\"}",
           "refId": "A"
         }
       ],
@@ -325,7 +325,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "100 * (1 - node_filesystem_files_free{mountpoint=\"/mnt/zeek-logs\",fstype!~\"tmpfs|overlay\"} / node_filesystem_files{mountpoint=\"/mnt/zeek-logs\",fstype!~\"tmpfs|overlay\"})",
+          "expr": "100 * (1 - node_filesystem_files_free{mountpoint=\"/mnt/ssd-logs\",fstype!~\"tmpfs|overlay\"} / node_filesystem_files{mountpoint=\"/mnt/ssd-logs\",fstype!~\"tmpfs|overlay\"})",
           "refId": "A"
         }
       ],

@@ -14,19 +14,27 @@ Complete Docker-based network security monitoring infrastructure for Raspberry P
 
 ## Quick Start
 
-### 1. Clone Repository
+### Option 1: One Command Setup (Recommended)
 
 ```bash
-git clone https://github.com/garrigueta/network-security-monitor.git
-cd network-security-monitor/monitoring
+make setup
 ```
 
-### 2. Configure
+### Option 2: Manual Setup
 
 ```bash
-cp .env.example .env
-nano .env
+# Start services
+docker compose up -d
+
+# Fix dashboards (first time only)
+./fix-dashboards.sh
 ```
+
+### Access
+
+- **Grafana**: http://localhost:3000 (admin/admin)
+- **Prometheus**: http://localhost:9090
+- **Loki**: http://localhost:3100
 
 Set your network interface:
 ```bash
