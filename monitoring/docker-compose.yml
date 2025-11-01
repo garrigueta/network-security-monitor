@@ -115,6 +115,7 @@ services:
       - ./grafana/dashboards/zeek-ssd-io.json:/etc/grafana/dashboards/zeek-ssd-io.json:ro
       - ./grafana/dashboards/zeek-ssd-storage.json:/etc/grafana/dashboards/zeek-ssd-storage.json:ro
       - ./grafana/dashboards/zeek-ssl-tls-analysis.json:/etc/grafana/dashboards/zeek-ssl-tls-analysis.json:ro
+      - ./grafana/dashboards/honeypot-attack-overview.json:/etc/grafana/dashboards/honeypot-attack-overview.json:ro
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin

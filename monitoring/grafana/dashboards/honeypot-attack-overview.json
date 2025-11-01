@@ -53,7 +53,7 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum by (honeypot_type) (count_over_time({job=\"honeypot\"}[24h]))",
+          "expr": "sum by (filename) (count_over_time({job=\"honeypot\"}[$__range]))",
           "refId": "A"
         }
       ],
@@ -121,7 +121,7 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum(count_over_time({job=\"honeypot\", honeypot_type=\"cowrie\"}[1h]))",
+          "expr": "sum(count_over_time({job=\"honeypot\"}[1h]))",
           "refId": "A"
         }
       ],
@@ -189,7 +189,7 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum(count_over_time({job=\"honeypot\", honeypot_type=\"dionaea\"}[1h]))",
+          "expr": "sum(count_over_time({job=\"honeypot\"} |~ \"dionaea|malware\"[1h]))",
           "refId": "A"
         }
       ],
@@ -277,7 +277,7 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum by (honeypot_type) (count_over_time({job=\"honeypot\"}[5m]))",
+          "expr": "sum by (filename) (count_over_time({job=\"honeypot\"}[5m]))",
           "legendFormat": "{{honeypot_type}}",
           "refId": "A"
         }
@@ -314,7 +314,7 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "{job=\"honeypot\", honeypot_type=\"cowrie\"} |~ \"login attempt\"",
+          "expr": "{job=\"honeypot\"} |~ \"(?i)(login|connection|auth)\"",
           "refId": "A"
         }
       ],
@@ -373,7 +373,7 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "topk(10, sum by (src_ip, username) (count_over_time({job=\"honeypot\", honeypot_type=\"cowrie\"} | json | __error__=\"\" [24h])))",
+          "expr": "topk(10, sum by (src_ip) (count_over_time({job=\"honeypot\"} | json | __error__=\"\" [$__range])))",
           "refId": "A"
         }
       ],
