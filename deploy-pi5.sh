@@ -92,9 +92,15 @@ else
     print_status "SSD already mounted"
 fi
 
-# Create directory structure
-sudo mkdir -p /mnt/ssd-logs/{zeek-logs,prometheus-data,loki-data,grafana-data,promtail-positions}
-sudo chown -R $USER:$USER /mnt/ssd-logs
+# Create directory structure with proper ownership
+sudo mkdir -p /mnt/ssd-logs/{zeek-logs/logs,zeek-logs/spool,prometheus-data,loki-data,grafana-data,promtail-positions}
+
+# Set ownership for each service (matching Docker user IDs)
+sudo chown -R 472:472 /mnt/ssd-logs/grafana-data      # Grafana
+sudo chown -R 65534:65534 /mnt/ssd-logs/prometheus-data # Prometheus  
+sudo chown -R 10001:10001 /mnt/ssd-logs/loki-data     # Loki
+sudo chown -R $USER:$USER /mnt/ssd-logs/zeek-logs     # Zeek
+sudo chown -R $USER:$USER /mnt/ssd-logs/promtail-positions # Promtail
 
 # Step 4: System update and install packages
 print_status "Updating system and installing packages..."

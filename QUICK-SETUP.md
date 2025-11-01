@@ -64,8 +64,14 @@ sudo chown -R $USER:$USER /mnt/ssd-logs
 echo '/dev/sda1 /mnt/ssd-logs ext4 defaults 0 2' | sudo tee -a /etc/fstab
 
 # Create directories for services
-sudo mkdir -p /mnt/ssd-logs/{zeek-logs,prometheus-data,loki-data,grafana-data,promtail-positions}
-sudo chown -R $USER:$USER /mnt/ssd-logs
+sudo mkdir -p /mnt/ssd-logs/{zeek-logs/logs,zeek-logs/spool,prometheus-data,loki-data,grafana-data,promtail-positions}
+
+# Set correct ownership for each service (Docker user IDs)
+sudo chown -R 472:472 /mnt/ssd-logs/grafana-data      # Grafana
+sudo chown -R 65534:65534 /mnt/ssd-logs/prometheus-data # Prometheus  
+sudo chown -R 10001:10001 /mnt/ssd-logs/loki-data     # Loki
+sudo chown -R $USER:$USER /mnt/ssd-logs/zeek-logs     # Zeek
+sudo chown -R $USER:$USER /mnt/ssd-logs/promtail-positions # Promtail
 
 # Verify mount
 df -h /mnt/ssd-logs
@@ -115,16 +121,6 @@ Once deployed, open your browser and go to:
 
 ## Troubleshooting
 
-### Quick Fix Script
-Run the automated troubleshooter:
-```bash
-cd ~/network-security-monitor
-chmod +x troubleshoot-pi5.sh
-./troubleshoot-pi5.sh
-```
-
-### Manual Troubleshooting
-
 If you encounter issues:
 
 1. **Services restarting (most common issue)**:
@@ -135,9 +131,13 @@ If you encounter issues:
    # If not mounted, mount it:
    sudo mount /dev/sda1 /mnt/ssd-logs
    
-   # Create missing directories
-   sudo mkdir -p /mnt/ssd-logs/{zeek-logs,prometheus-data,loki-data,grafana-data,promtail-positions}
-   sudo chown -R $USER:$USER /mnt/ssd-logs
+   # Fix directories and permissions
+   sudo mkdir -p /mnt/ssd-logs/{zeek-logs/logs,zeek-logs/spool,prometheus-data,loki-data,grafana-data,promtail-positions}
+   sudo chown -R 472:472 /mnt/ssd-logs/grafana-data
+   sudo chown -R 65534:65534 /mnt/ssd-logs/prometheus-data
+   sudo chown -R 10001:10001 /mnt/ssd-logs/loki-data
+   sudo chown -R $USER:$USER /mnt/ssd-logs/zeek-logs
+   sudo chown -R $USER:$USER /mnt/ssd-logs/promtail-positions
    
    # Restart services
    docker compose down
