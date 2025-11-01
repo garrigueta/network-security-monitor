@@ -9,41 +9,41 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 up: ## Start all services
-	docker-compose up -d
+	docker compose up -d
 
 down: ## Stop all services
-	docker-compose down
+	docker compose down
 
 restart: ## Restart all services
-	docker-compose restart
+	docker compose restart
 
 logs: ## View logs from all services
-	docker-compose logs -f
+	docker compose logs -f
 
 logs-zeek: ## View Zeek logs
-	docker-compose logs -f zeek
+	docker compose logs -f zeek
 
 logs-grafana: ## View Grafana logs
-	docker-compose logs -f grafana
+	docker compose logs -f grafana
 
 logs-prometheus: ## View Prometheus logs
-	docker-compose logs -f prometheus
+	docker compose logs -f prometheus
 
 ps: ## Show running services
-	docker-compose ps
+	docker compose ps
 
 build: ## Build all containers
-	docker-compose build
+	docker compose build
 
 rebuild: ## Rebuild and restart all services
-	docker-compose up -d --build
+	docker compose up -d --build
 
 clean: ## Stop and remove all containers and volumes
-	docker-compose down -v
+	docker compose down -v
 
 status: ## Check service health
 	@echo "=== Docker Compose Services ==="
-	@docker-compose ps
+	@docker compose ps
 	@echo ""
 	@echo "=== Zeek Status ==="
 	@docker exec zeek zeekctl status || echo "Zeek not running"
@@ -62,5 +62,5 @@ backup: ## Backup all volumes
 	@echo "Backup complete!"
 
 update: ## Pull latest images and restart
-	docker-compose pull
-	docker-compose up -d
+	docker compose pull
+	docker compose up -d

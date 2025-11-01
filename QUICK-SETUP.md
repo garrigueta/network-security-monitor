@@ -14,7 +14,10 @@
    ./deploy-pi5.sh
    ```
 
-3. **Follow the prompts** and wait for deployment to complete.
+3. **Follow the prompts** - the script will automatically:
+   - Mount your USB SSD
+   - Configure eth1 for mirrored traffic monitoring
+   - Deploy the complete monitoring stack
 
 ## Option 2: Manual Setup
 
@@ -22,6 +25,9 @@
 ```bash
 # SSH to your Pi5
 ssh pi@<your-pi-ip>
+
+# Fix hostname resolution (if needed)
+echo "127.0.1.1 $(hostname)" | sudo tee -a /etc/hosts
 
 # Update system
 sudo apt update && sudo apt upgrade -y
@@ -32,9 +38,37 @@ sh get-docker.sh
 sudo usermod -aG docker pi
 
 # Install Docker Compose and tools
-sudo apt install docker-compose-plugin git make -y
+sudo apt install docker-compose-plugin git make tcpdump -y
 
 # Logout and login again (or run: newgrp docker)
+```
+
+### Mount USB SSD for Log Storage
+```bash
+# List available storage devices
+lsblk
+
+# Find your USB SSD (usually /dev/sda1 or /dev/sdb1)
+sudo fdisk -l
+
+# Create mount point
+sudo mkdir -p /mnt/ssd-logs
+
+# Mount the SSD (replace /dev/sda1 with your actual device)
+sudo mount /dev/sda1 /mnt/ssd-logs
+
+# Set proper ownership
+sudo chown -R $USER:$USER /mnt/ssd-logs
+
+# Add to fstab for persistent mounting
+echo '/dev/sda1 /mnt/ssd-logs ext4 defaults 0 2' | sudo tee -a /etc/fstab
+
+# Create directories for services
+sudo mkdir -p /mnt/ssd-logs/{zeek-logs,prometheus-data,loki-data,grafana-data,promtail-positions}
+sudo chown -R $USER:$USER /mnt/ssd-logs
+
+# Verify mount
+df -h /mnt/ssd-logs
 ```
 
 ### Deploy Monitoring Stack
@@ -47,18 +81,31 @@ cd network-security-monitor/monitoring
 # Configure environment
 cp .env.example .env
 
-# Check your network interface
+# Check your network interfaces
 ip link show
 
-# Edit .env file and set correct interface
+# Verify dual NIC setup
+# eth0: Regular switch port (management/internet)
+# eth1: Mirrored traffic port (monitoring)
+
+# Test mirrored traffic on eth1
+sudo tcpdump -i eth1 -c 10
+
+# Edit .env file and confirm interface setting
 nano .env
-# Change: ZEEK_INTERFACE=eth0  (or wlan0 for WiFi)
+# Should show: ZEEK_INTERFACE=eth1
 
 # Deploy the stack
 make up
 
+# If make command fails, use docker compose directly:
+# docker compose up -d
+
 # Check status
 make status
+
+# If make status fails, use:
+# docker compose ps
 ```
 
 ## Access Your Monitoring Dashboard
