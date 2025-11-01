@@ -115,22 +115,46 @@ Once deployed, open your browser and go to:
 
 ## Troubleshooting
 
+### Quick Fix Script
+Run the automated troubleshooter:
+```bash
+cd ~/network-security-monitor
+chmod +x troubleshoot-pi5.sh
+./troubleshoot-pi5.sh
+```
+
+### Manual Troubleshooting
+
 If you encounter issues:
 
-1. **Check Docker is running**:
+1. **Services restarting (most common issue)**:
+   ```bash
+   # Check if SSD is mounted
+   df -h /mnt/ssd-logs
+   
+   # If not mounted, mount it:
+   sudo mount /dev/sda1 /mnt/ssd-logs
+   
+   # Create missing directories
+   sudo mkdir -p /mnt/ssd-logs/{zeek-logs,prometheus-data,loki-data,grafana-data,promtail-positions}
+   sudo chown -R $USER:$USER /mnt/ssd-logs
+   
+   # Restart services
+   docker compose down
+   docker compose up -d
+   ```
+
+2. **Check Docker is running**:
    ```bash
    sudo systemctl status docker
    ```
 
-2. **Restart services**:
+3. **View service logs**:
    ```bash
-   cd ~/network-security-monitor/monitoring
-   make restart
-   ```
-
-3. **View logs**:
-   ```bash
-   make logs
+   docker compose logs grafana
+   docker compose logs prometheus
+   docker compose logs zeek
+   docker compose logs loki
    ```
 
 4. **Check system resources**:
@@ -138,6 +162,15 @@ If you encounter issues:
    free -h
    df -h
    docker stats
+   ```
+
+5. **Network interface issues**:
+   ```bash
+   # Verify eth1 exists and is up
+   ip link show eth1
+   
+   # Test for mirrored traffic
+   sudo tcpdump -i eth1 -c 10
    ```
 
 ## What Gets Installed

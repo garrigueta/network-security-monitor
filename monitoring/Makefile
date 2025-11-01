@@ -45,11 +45,23 @@ status: ## Check service health
 	@echo "=== Docker Compose Services ==="
 	@docker compose ps
 	@echo ""
-	@echo "=== Zeek Status ==="
-	@docker exec zeek zeekctl status || echo "Zeek not running"
+	@echo "=== Container Logs (Last 10 lines each) ==="
+	@echo "--- Zeek ---"
+	@docker compose logs --tail=10 zeek 2>/dev/null || echo "Zeek logs not available"
+	@echo "--- Prometheus ---"
+	@docker compose logs --tail=10 prometheus 2>/dev/null || echo "Prometheus logs not available"
+	@echo "--- Grafana ---"
+	@docker compose logs --tail=10 grafana 2>/dev/null || echo "Grafana logs not available"
+	@echo "--- Loki ---"
+	@docker compose logs --tail=10 loki 2>/dev/null || echo "Loki logs not available"
 	@echo ""
-	@echo "=== Prometheus Targets ==="
-	@curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health}' || echo "Prometheus not accessible"
+	@echo "=== SSD Mount Status ==="
+	@df -h /mnt/ssd-logs 2>/dev/null || echo "SSD not mounted at /mnt/ssd-logs"
+	@echo ""
+	@echo "=== Service Health Check ==="
+	@curl -s http://localhost:9090/-/healthy >/dev/null && echo "✓ Prometheus: Healthy" || echo "✗ Prometheus: Not responding"
+	@curl -s http://localhost:3000/api/health >/dev/null && echo "✓ Grafana: Healthy" || echo "✗ Grafana: Not responding"
+	@curl -s http://localhost:3100/ready >/dev/null && echo "✓ Loki: Healthy" || echo "✗ Loki: Not responding"
 
 backup: ## Backup all volumes
 	@mkdir -p backups
