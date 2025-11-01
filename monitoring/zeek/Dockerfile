@@ -47,6 +47,10 @@ RUN echo "LogDir = /mnt/zeek-logs/logs" >> /usr/local/zeek/etc/zeekctl.cfg && \
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD /usr/local/zeek/bin/zeekctl status | grep -q "running" || exit 1
+
 WORKDIR /usr/local/zeek
 
 ENTRYPOINT ["/entrypoint.sh"]
