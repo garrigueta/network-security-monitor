@@ -47,8 +47,11 @@ RUN groupadd -g 1000 zeek && \
 RUN echo "LogDir = /mnt/zeek-logs/logs" >> /usr/local/zeek/etc/zeekctl.cfg && \
     echo "SpoolDir = /mnt/zeek-logs/spool" >> /usr/local/zeek/etc/zeekctl.cfg
 
-# Set ownership of zeek directories
-RUN chown -R zeek:zeek /usr/local/zeek /mnt/zeek-logs
+# Set ownership of directories that zeek needs to write to
+RUN chown -R zeek:zeek /mnt/zeek-logs && \
+    chown zeek:zeek /usr/local/zeek/etc/zeekctl.cfg && \
+    mkdir -p /usr/local/zeek/spool /usr/local/zeek/logs && \
+    chown -R zeek:zeek /usr/local/zeek/spool /usr/local/zeek/logs
 
 # Copy startup script
 COPY entrypoint.sh /entrypoint.sh
