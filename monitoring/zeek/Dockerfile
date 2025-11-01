@@ -49,7 +49,8 @@ RUN echo "LogDir = /mnt/zeek-logs/logs" >> /usr/local/zeek/etc/zeekctl.cfg && \
 
 # Set ownership of directories that zeek needs to write to
 RUN chown -R zeek:zeek /mnt/zeek-logs && \
-    chown zeek:zeek /usr/local/zeek/etc/zeekctl.cfg && \
+    chown -R zeek:zeek /usr/local/zeek/etc && \
+    chown -R zeek:zeek /usr/local/zeek/share && \
     mkdir -p /usr/local/zeek/spool /usr/local/zeek/logs && \
     chown -R zeek:zeek /usr/local/zeek/spool /usr/local/zeek/logs
 
@@ -63,7 +64,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 WORKDIR /usr/local/zeek
 
-# Switch to zeek user
-USER zeek
+# Don't switch to zeek user - keep as root for packet capture privileges
+# USER zeek
 
 ENTRYPOINT ["/entrypoint.sh"]

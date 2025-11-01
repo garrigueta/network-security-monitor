@@ -24,7 +24,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "ff2gggrwveku8b"
+        "uid": "P8E80F9AEF21F6940"
       },
       "fieldConfig": {
         "defaults": {
@@ -74,7 +74,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "ff2gggrwveku8b"
+            "uid": "P8E80F9AEF21F6940"
           },
           "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*conn.log\"}[10m]))",
           "legendFormat": "Connections (10m)",
@@ -87,7 +87,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "ff2gggrwveku8b"
+        "uid": "P8E80F9AEF21F6940"
       },
       "fieldConfig": {
         "defaults": {
@@ -137,7 +137,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "ff2gggrwveku8b"
+            "uid": "P8E80F9AEF21F6940"
           },
           "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*dns.log\"}[10m]))",
           "legendFormat": "DNS Queries (10m)",
@@ -150,7 +150,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "ff2gggrwveku8b"
+        "uid": "P8E80F9AEF21F6940"
       },
       "fieldConfig": {
         "defaults": {
@@ -207,7 +207,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "ff2gggrwveku8b"
+            "uid": "P8E80F9AEF21F6940"
           },
           "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*notice.log\"}[10m]))",
           "legendFormat": "Notices (10m)",
@@ -220,7 +220,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "ff2gggrwveku8b"
+        "uid": "P8E80F9AEF21F6940"
       },
       "fieldConfig": {
         "defaults": {
@@ -277,7 +277,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "ff2gggrwveku8b"
+            "uid": "P8E80F9AEF21F6940"
           },
           "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*weird.log\"}[10m]))",
           "legendFormat": "Weird Events (10m)",
@@ -290,7 +290,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "ff2gggrwveku8b"
+        "uid": "P8E80F9AEF21F6940"
       },
       "fieldConfig": {
         "defaults": {
@@ -372,7 +372,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "ff2gggrwveku8b"
+            "uid": "P8E80F9AEF21F6940"
           },
           "expr": "sum by() (count_over_time({job=\"zeek\", filename=~\".*conn.log\"}[1m]))",
           "legendFormat": "Connections/minute",
@@ -385,7 +385,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "ff2gggrwveku8b"
+        "uid": "P8E80F9AEF21F6940"
       },
       "fieldConfig": {
         "defaults": {
@@ -467,7 +467,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "ff2gggrwveku8b"
+            "uid": "P8E80F9AEF21F6940"
           },
           "expr": "sum by() (count_over_time({job=\"zeek\", filename=~\".*dns.log\"}[1m]))",
           "legendFormat": "DNS Queries/minute",
@@ -480,7 +480,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "ff2gggrwveku8b"
+        "uid": "P8E80F9AEF21F6940"
       },
       "fieldConfig": {
         "defaults": {},
@@ -508,7 +508,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "ff2gggrwveku8b"
+            "uid": "P8E80F9AEF21F6940"
           },
           "expr": "{job=\"zeek\", filename=~\".*conn.log\"}",
           "refId": "A"
@@ -520,7 +520,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "ff2gggrwveku8b"
+        "uid": "P8E80F9AEF21F6940"
       },
       "fieldConfig": {
         "defaults": {},
@@ -548,7 +548,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "ff2gggrwveku8b"
+            "uid": "P8E80F9AEF21F6940"
           },
           "expr": "{job=\"zeek\", filename=~\".*dns.log\"}",
           "refId": "A"

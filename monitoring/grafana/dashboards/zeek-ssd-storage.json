@@ -21,7 +21,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "af2jr65uoutc0c"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -95,7 +95,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "af2jr65uoutc0c"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -155,7 +155,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "af2jr65uoutc0c"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -215,7 +215,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "af2jr65uoutc0c"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -275,7 +275,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "af2jr65uoutc0c"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
