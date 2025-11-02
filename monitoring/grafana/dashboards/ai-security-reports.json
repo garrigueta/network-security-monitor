@@ -573,12 +573,8 @@
       "type": "table"
     },
     {
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
       "gridPos": {
-        "h": 8,
+        "h": 16,
         "w": 24,
         "x": 0,
         "y": 12
@@ -590,11 +586,11 @@
       },
       "targets": [
         {
-          "cacheDurationSeconds": 30,
+          "cacheDurationSeconds": 300,
           "fields": [
             {
               "jsonPath": "$.ai_analysis",
-              "name": "ai_analysis",
+              "name": "AI Analysis",
               "type": "string"
             }
           ],
@@ -605,17 +601,28 @@
         }
       ],
       "options": {
-        "code": {
-          "language": "plaintext",
-          "showLineNumbers": false,
-          "showMiniMap": false
+        "showHeader": false,
+        "cellHeight": "auto",
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            },
+            "inspect": false
+          }
         },
-        "content": "${__data.fields.ai_analysis}",
-        "mode": "markdown"
+        "overrides": []
       },
       "pluginVersion": "12.2.1",
       "title": "Latest AI Security Analysis",
-      "type": "text"
+      "type": "table"
     }
   ],
   "preload": false,

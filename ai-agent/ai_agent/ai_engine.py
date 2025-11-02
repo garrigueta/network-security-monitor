@@ -20,7 +20,11 @@ class AIEngine:
     
     def __init__(self):
         self.data_collector = DataCollector()
-        self.http_client = httpx.AsyncClient(timeout=300.0)  # 5 minutes timeout for large models
+        # Increased timeout and connection settings for remote Ollama
+        self.http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(600.0, connect=30.0, read=600.0),  # 10 minutes timeout
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
+        )
         # Use centralized system prompt
         self.system_prompt = prompt_templates.SYSTEM_PROMPT
     
@@ -253,45 +257,81 @@ class AIEngine:
         return timeframe_map.get(timeframe, 24)
     
     async def _query_ollama(self, prompt: str, analysis_type: str = "query") -> str:
-        """Query Ollama LLM with the given prompt and analysis-specific parameters"""
-        try:
-            # Get parameters for this analysis type
-            params = PromptConfig.get_params(analysis_type)
-            
-            payload = {
-                "model": settings.ollama_model,
-                "prompt": f"{self.system_prompt}\n\n{prompt}",
-                "stream": False,
-                "options": {
-                    "temperature": params.get("temperature", 0.7),
-                    "top_p": params.get("top_p", 0.9),
-                    "num_predict": params.get("max_tokens", 2048)
-                }
+        """Query Ollama LLM with the given prompt and analysis-specific parameters with retry logic"""
+        # Get parameters for this analysis type
+        params = PromptConfig.get_params(analysis_type)
+        
+        payload = {
+            "model": settings.ollama_model,
+            "prompt": f"{self.system_prompt}\n\n{prompt}",
+            "stream": False,
+            "options": {
+                "temperature": params.get("temperature", 0.7),
+                "top_p": params.get("top_p", 0.9),
+                "num_predict": params.get("max_tokens", 2048)
             }
-            
-            # Add stop sequences if specified
-            if params.get("stop"):
-                payload["options"]["stop"] = params["stop"]
-            
-            logger.info(f"Querying Ollama at {settings.ollama_url} with model {settings.ollama_model}")
-            
-            response = await self.http_client.post(
-                f"{settings.ollama_url}/api/generate",
-                json=payload,
-                timeout=300.0  # 5 minutes timeout for large models
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return result.get("response", "No response from AI model")
-            else:
-                logger.error(f"Ollama API error: {response.status_code} - {response.text}")
-                return "AI analysis is currently unavailable (Ollama connection error)"
+        }
+        
+        # Add stop sequences if specified
+        if params.get("stop"):
+            payload["options"]["stop"] = params["stop"]
+        
+        # Retry logic with exponential backoff
+        max_retries = 3
+        retry_delay = 2  # Start with 2 seconds
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Querying Ollama at {settings.ollama_url} with model {settings.ollama_model} (attempt {attempt + 1}/{max_retries})")
                 
-        except Exception as e:
-            logger.error(f"Error querying Ollama: {type(e).__name__}: {e}")
-            logger.error(f"Ollama URL: {settings.ollama_url}, Model: {settings.ollama_model}")
-            return f"AI analysis failed: {type(e).__name__}: {str(e)}"
+                response = await self.http_client.post(
+                    f"{settings.ollama_url}/api/generate",
+                    json=payload
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    ai_response = result.get("response", "")
+                    if ai_response:
+                        logger.info(f"Successfully received response from Ollama ({len(ai_response)} chars)")
+                        return ai_response
+                    else:
+                        logger.warning("Empty response from Ollama")
+                        return "AI model returned an empty response"
+                else:
+                    logger.error(f"Ollama API error: {response.status_code} - {response.text}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                    return f"AI analysis unavailable: HTTP {response.status_code}"
+                    
+            except httpx.ReadTimeout as e:
+                logger.error(f"Ollama read timeout on attempt {attempt + 1}: {e}")
+                if attempt < max_retries - 1:
+                    logger.info(f"Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                return "AI analysis timed out - the model took too long to respond. Consider using a smaller/faster model."
+                
+            except httpx.ConnectError as e:
+                logger.error(f"Cannot connect to Ollama at {settings.ollama_url}: {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                return f"Cannot connect to AI model at {settings.ollama_url}. Please check if Ollama is running."
+                
+            except Exception as e:
+                logger.error(f"Unexpected error querying Ollama (attempt {attempt + 1}): {type(e).__name__}: {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                return f"AI analysis failed: {type(e).__name__}: {str(e)}"
+        
+        return "AI analysis failed after multiple retries"
     
     async def close(self):
         """Close HTTP client and cleanup"""

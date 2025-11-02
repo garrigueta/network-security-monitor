@@ -90,7 +90,7 @@ class ReportScheduler:
             period_hours = 1
             
         elif frequency == ReportFrequency.DAILY:
-            trigger = CronTrigger(hour=8, minute=0)  # Daily at 8 AM
+            trigger = IntervalTrigger(hours=5)  # Every 5 hours
             period_hours = 24
             
         elif frequency == ReportFrequency.WEEKLY:

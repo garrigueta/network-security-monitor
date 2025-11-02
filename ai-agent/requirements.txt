@@ -14,3 +14,4 @@ apscheduler==3.10.4
 
 # Template engine for HTML reports
 jinja2==3.1.2
+markdown==3.5.1
