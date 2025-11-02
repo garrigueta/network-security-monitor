@@ -54,6 +54,30 @@ scenarios:
     enabled: true
     attempts: 3
     delay: 2
+    
+  - name: "dns_tunneling"
+    protocol: "dns"
+    enabled: true
+    attempts: 10
+    delay: 1
+    
+  - name: "suspicious_domains"
+    protocol: "http"
+    enabled: true
+    attempts: 8
+    delay: 2
+    
+  - name: "port_scan"
+    protocol: "scan"
+    enabled: true
+    attempts: 20
+    delay: 0.5
+    
+  - name: "malformed_packets"
+    protocol: "weird"
+    enabled: true
+    attempts: 5
+    delay: 1
 
 # Attack patterns
 patterns:
@@ -76,6 +100,50 @@ patterns:
   postgresql:
     usernames: ["postgres", "admin", "user"]
     passwords: ["postgres", "admin", "password"]
+    
+  dns:
+    # Suspicious domains for DNS queries
+    domains:
+      - "malware-c2-server.com"
+      - "phishing-site.net"
+      - "cryptominer.xyz"
+      - "ransomware.download"
+      - "botnet-command.org"
+      - "exploit-kit.ru"
+      - "data-exfil.tk"
+      - "suspicious-tracking.cn"
+    # DNS tunneling subdomains (encode data in DNS queries)
+    tunnel_prefixes:
+      - "exec-"
+      - "cmd-"
+      - "data-"
+      - "exfil-"
+    
+  suspicious:
+    # Known malicious domains
+    domains:
+      - "http://malware-distribution.com/payload.exe"
+      - "http://phishing-login.net/steal.php"
+      - "http://cryptojacking.xyz/miner.js"
+      - "http://tor-exit-node.onion.ly/proxy"
+      - "http://ddos-bot.ru/join"
+      - "http://exploit-database.org/0day.zip"
+    # Suspicious user agents
+    user_agents:
+      - "Wget/1.14"  # Automated tool
+      - "curl/7.64.0"  # Command-line
+      - "sqlmap/1.0"  # SQL injection tool
+      - "Nikto/2.1.6"  # Vulnerability scanner
+      - "Metasploit"  # Penetration testing
+      - "() { :;}; /bin/bash"  # Shellshock exploit
+    
+  ports:
+    # Common ports for scanning
+    common: [21, 22, 23, 25, 80, 443, 3306, 5432, 8080]
+    # Suspicious ports
+    suspicious: [4444, 31337, 12345, 6667, 1337, 666]
+    # High ports (ephemeral range)
+    high: [50000, 54321, 55555, 60000, 65000]
 
 # Simulation options
 simulation:

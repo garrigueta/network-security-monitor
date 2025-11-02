@@ -13,25 +13,37 @@ A sophisticated multi-protocol attack simulator designed to test honeypot detect
 - **SMTP** (Port 25) - Email server enumeration
 - **MySQL** (Port 3306) - Database brute force
 - **PostgreSQL** (Port 5432) - Database connection attempts
-- **POP3/IMAP** (Ports 110, 143, 993, 995) - Email protocol testing
-- **SOCKS5** (Port 1080) - Proxy connection attempts
-- **VNC** (Port 5900) - Remote desktop scanning
+- **DNS** (Port 53) - DNS tunneling and suspicious domain queries
+- **Port Scanning** - TCP SYN scans across common/suspicious ports
+- **Malformed Packets** - Generates Zeek "weird" events
 
 ### Attack Scenarios
 1. **SSH Brute Force** - Tests common username/password combinations
 2. **Telnet Scanning** - Automated login attempts
 3. **FTP Anonymous Access** - Tests for anonymous FTP access
-4. **HTTP Path Scanning** - Probes for common vulnerable paths
+4. **HTTP Path Scanning** - Probes for common vulnerable paths (admin, .git, shell.php, etc.)
 5. **MySQL Brute Force** - Database credential testing
 6. **PostgreSQL Scanning** - Database enumeration
+7. **DNS Tunneling** - Simulates data exfiltration via DNS queries with encoded data
+8. **Suspicious Domains** - Queries malicious domains (malware-c2-server.com, phishing-site.net, etc.)
+9. **Port Scanning** - TCP connection attempts across common/suspicious/high ports
+10. **Malformed Packets** - Generates weird network events:
+    - Oversized HTTP headers (10KB+)
+    - Malformed HTTP requests
+    - Invalid TCP flags
+    - Fragmented packet streams
 
 ### Advanced Features
 - ⏱️ **Randomized Timing** - Adds jitter to simulate human-like behavior
-- 🎭 **Fake User Agents** - Random browser identification for HTTP attacks
+- 🎭 **Fake User Agents** - Random browser identification including attack tools (sqlmap, Nikto, Metasploit)
 - 📊 **Detailed Logging** - Color-coded output with timestamps
 - 💾 **Result Persistence** - Saves attack results to JSON files
 - 🔀 **Randomized Order** - Varies attack sequences to avoid patterns
 - 🎯 **Configurable Scenarios** - YAML-based configuration for easy customization
+- 🌐 **DNS Events** - Generates suspicious DNS queries for SIEM/IDS detection
+- 🔍 **Network Anomalies** - Creates weird packets that trigger Zeek alerts
+- 🎲 **Dynamic Data** - Uses Faker library for realistic attack patterns
+- 🚨 **Multi-Layer Detection** - Tests honeypot, DNS monitoring, Zeek, and network IDS
 
 ## Installation
 
@@ -144,6 +156,42 @@ Results are saved to `./results/attack_results_YYYYMMDD_HHMMSS.json`:
   "response_time": 2.345
 }
 ```
+
+## What Gets Detected
+
+The simulator triggers multiple monitoring systems:
+
+### Honeypot Detection (Cowrie/Heralding)
+✅ SSH brute force attempts  
+✅ Telnet connection attempts  
+✅ FTP authentication failures  
+✅ MySQL/PostgreSQL connection attempts  
+✅ All login attempts logged with credentials
+
+### Zeek Network Monitoring
+✅ DNS queries (weird domains detected)  
+✅ HTTP unusual requests (oversized headers, malformed)  
+✅ Port scan patterns  
+✅ TCP connection anomalies  
+✅ Protocol violations (weird.log events)  
+✅ SSL/TLS certificate validation
+
+### Loki Log Aggregation
+✅ All honeypot events indexed  
+✅ Searchable by service, IP, protocol  
+✅ Time-series attack patterns  
+
+### Prometheus Metrics
+✅ Attack rate per minute  
+✅ Service availability  
+✅ Resource usage during attacks
+
+### AI Agent Analysis
+✅ Pattern recognition (automated tools detected)  
+✅ Threat level assessment  
+✅ Attack attribution (botnet signatures)  
+✅ Recommendations generation  
+✅ Trend analysis over time
 
 ## Integration with AI Agent
 

@@ -5,3 +5,5 @@ psycopg2-binary==2.9.9
 colorama==0.4.6
 pyyaml==6.0.1
 faker==20.1.0
+dnspython==2.4.2  # DNS queries
+scapy==2.5.0  # Packet crafting for weird network events
