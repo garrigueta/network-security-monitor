@@ -1,21 +1,28 @@
 # Network Security Monitoring Stack
 
-Complete containerized network security monitoring and threat intelligence platform for Raspberry Pi.
+Complete containerized network security monitoring and AI-powered threat intelligence platform for Raspberry Pi.
 
 ## 📦 What's Included
+
+**AI Agent** (`ai-agent/`) - AI-Powered Security Analysis
+- AI-powered security report generation with Ollama
+- Automated threat analysis every 5 hours
+- RESTful API for security queries
+- Model Context Protocol (MCP) server
+- Integration with Grafana dashboards
 
 **Monitoring Stack** (`monitoring/`) - Main Raspberry Pi
 - Zeek network security monitor
 - Prometheus metrics collection
 - Loki log aggregation
-- Grafana dashboards
+- Grafana dashboards with AI analysis
 - Cryptocurrency price tracking
 
 **Honeypot Stack** (`honeypot/`) - Optional second device
 - Cowrie SSH/Telnet honeypot
 - Dionaea malware collection
 - HoneyTrap service emulation
-- Integrated with main monitoring
+- Integrated with main monitoring and AI analysis
 
 ## � Quick Start
 
@@ -60,8 +67,11 @@ docker-compose up -d
 ## 📁 Project Structure
 
 ```
-```
 network-security-monitor/
+├── ai-agent/            # AI security analysis - deploy with monitoring stack
+│   ├── README.md        # AI agent documentation
+│   ├── API-DOCS.md      # API documentation
+│   └── REPORTS.md       # Report generation guide
 ├── monitoring/          # Main stack - deploy on primary Raspberry Pi
 │   ├── README.md        # Complete monitoring stack documentation
 │   └── ...
@@ -72,22 +82,30 @@ network-security-monitor/
 
 ## 📖 Documentation
 
+- **AI Agent**: [ai-agent/README.md](ai-agent/README.md) - AI-powered security analysis setup
+- **AI API**: [ai-agent/API-DOCS.md](ai-agent/API-DOCS.md) - RESTful API reference
+- **Reports**: [ai-agent/REPORTS.md](ai-agent/REPORTS.md) - Automated report generation
 - **Monitoring Stack**: [monitoring/README.md](monitoring/README.md) - Full setup guide, troubleshooting, customization
 - **Honeypot Stack**: [honeypot/README.md](honeypot/README.md) - Honeypot deployment and attack analysis
 
 ## ✨ Features
 
-- Fully containerized with Docker Compose
-- Auto-provisioned Grafana dashboards
-- Network traffic analysis with Zeek
-- Centralized logging with Loki
-- Optional honeypot integration
-- Cryptocurrency price tracking
+- **AI-Powered Security Analysis** - Automated threat analysis with Ollama LLM every 5 hours
+- **Intelligent Reporting** - Executive, technical, and detailed security reports with AI insights
+- **Real-time Monitoring** - Network traffic analysis with Zeek and live metrics
+- **Centralized Logging** - Loki log aggregation from all security components
+- **Visual Dashboards** - Auto-provisioned Grafana dashboards with AI analysis integration
+- **Threat Intelligence** - Optional honeypot integration for real-world attack data
+- **Cryptocurrency Tracking** - Monitor Bitcoin, Ethereum, and Tron prices
+- **Fully Containerized** - Easy deployment and management with Docker Compose
+- **RESTful API** - Query security data and trigger analysis programmatically
+- **Model Context Protocol** - MCP server for AI agent integration
 
 ## 🔗 Links
 
 - **Repository**: https://github.com/garrigueta/network-security-monitor
 - **Grafana**: http://localhost:3000 (admin/admin after deployment)
+- **AI Agent API**: http://localhost:8080 (see [API-DOCS.md](ai-agent/API-DOCS.md))
 - **Prometheus**: http://localhost:9090
 - **Loki**: http://localhost:3100
 ```
@@ -206,6 +224,13 @@ Access Grafana on your main Raspberry Pi and open the **Honeypot Attack Overview
 
 All dashboards are automatically provisioned on startup:
 
+#### AI Security Analysis
+- **AI Security Reports Dashboard**: AI-powered security analysis
+  - System health monitoring
+  - Active scheduled jobs
+  - Recent AI security reports list
+  - Latest AI security analysis with formatted text
+
 #### Network Security Monitoring
 - **Zeek Security Overview**: Network security alerts and anomalies
 - **Zeek Connection Analysis**: Network connection patterns and flows
@@ -229,13 +254,16 @@ All dashboards are automatically provisioned on startup:
 #### Financial Monitoring
 - **Crypto Prices**: Real-time cryptocurrency prices (Bitcoin, Ethereum, Tron)
 
-### Metrics Endpoints
+### Service Endpoints
 
-- **Prometheus**: `:9090`
-- **Node Exporter**: `:9100/metrics`
-- **Crypto Exporter**: `:9101/metrics`
-- **Loki**: `:3100`
-- **Promtail**: `:9080`
+- **AI Agent API**: `:8080` - RESTful API for security analysis
+- **AI Agent MCP**: `:8081` - Model Context Protocol server
+- **Grafana**: `:3000` - Visualization dashboards
+- **Prometheus**: `:9090` - Metrics storage and queries
+- **Loki**: `:3100` - Log aggregation
+- **Node Exporter**: `:9100/metrics` - System metrics
+- **Crypto Exporter**: `:9101/metrics` - Cryptocurrency prices
+- **Promtail**: `:9080` - Log shipping agent
 
 ## 🛠️ Management Commands
 
