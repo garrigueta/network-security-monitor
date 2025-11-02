@@ -1,0 +1,440 @@
+openapi: 3.0.3
+info:
+  title: Network Security AI Agent API
+  description: |
+    AI-powered network security analysis API that provides intelligent analysis of honeypot data, 
+    network metrics, and security threats. Integrates with monitoring infrastructure including 
+    Grafana, Loki, and Prometheus to deliver comprehensive security insights.
+    
+    ## Features
+    - Honeypot attack pattern analysis
+    - Network security metrics evaluation  
+    - Natural language security queries
+    - MCP (Model Context Protocol) server integration
+    - Real-time threat detection and analysis
+    
+    ## Authentication
+    API key authentication is required for all endpoints except health checks.
+    Include the API key in the `X-API-Key` header.
+  version: 0.1.0
+  contact:
+    name: Network Security Monitor
+    url: https://github.com/garrigueta/network-security-monitor
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://192.168.1.135:8080
+    description: Production server
+  - url: http://localhost:8080
+    description: Local development server
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      description: Check the health status of the AI agent and its components
+      operationId: getHealth
+      security: []  # No authentication required for health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: "healthy"
+                version: "0.1.0"
+                services:
+                  api: "running"
+                  mcp_server: "running"
+                  ai_engine: "running"
+
+  /analyze/honeypot:
+    post:
+      summary: Analyze Honeypot Activity
+      description: |
+        Analyze honeypot logs and attack patterns for specified time period and sources.
+        Provides AI-powered insights into attack vectors, threat patterns, and security recommendations.
+      operationId: analyzeHoneypot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HoneypotAnalysisRequest'
+            examples:
+              basic_analysis:
+                summary: Basic 1-hour analysis
+                value:
+                  period: "1h"
+                  sources: ["cowrie", "dionaea"]
+              detailed_analysis:
+                summary: Detailed 24-hour analysis with focus
+                value:
+                  period: "24h"
+                  sources: ["cowrie", "dionaea", "honeytrap"]
+                  focus_areas: ["brute_force", "malware"]
+      responses:
+        '200':
+          description: Analysis completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /analyze/network:
+    post:
+      summary: Analyze Network Security
+      description: |
+        Analyze network security metrics, traffic patterns, and system performance.
+        Provides insights into network anomalies, security events, and performance issues.
+      operationId: analyzeNetwork
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkAnalysisRequest'
+            examples:
+              traffic_analysis:
+                summary: Network traffic analysis
+                value:
+                  metrics: ["traffic", "connections"]
+                  timeframe: "1h"
+              security_analysis:
+                summary: Security-focused analysis
+                value:
+                  metrics: ["security_events", "anomalies"]
+                  timeframe: "24h"
+                  focus: "threats"
+      responses:
+        '200':
+          description: Analysis completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /query:
+    post:
+      summary: Natural Language Query
+      description: |
+        Submit natural language questions about network security, honeypot activity, 
+        or system metrics. The AI will analyze the query and provide relevant insights.
+      operationId: naturalLanguageQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+            examples:
+              security_question:
+                summary: Security status inquiry
+                value:
+                  query: "What are the most common attack patterns in the last 24 hours?"
+              performance_question:
+                summary: Performance inquiry
+                value:
+                  query: "Are there any network anomalies affecting system performance?"
+      responses:
+        '200':
+          description: Query processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+        '400':
+          description: Invalid query format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /mcp/tools:
+    get:
+      summary: List MCP Tools
+      description: |
+        List all available Model Context Protocol (MCP) tools for data access and analysis.
+        These tools can be used for programmatic access to security data and metrics.
+      operationId: listMcpTools
+      responses:
+        '200':
+          description: List of available MCP tools
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpToolsResponse'
+              example:
+                tools:
+                  - name: "get_honeypot_activity"
+                    description: "Get recent honeypot activity and attack patterns"
+                    parameters:
+                      hours:
+                        type: "integer"
+                        default: 24
+                      limit:
+                        type: "integer"
+                        default: 100
+                  - name: "get_network_metrics"
+                    description: "Get network and system metrics"
+                    parameters:
+                      metric:
+                        type: "string"
+                        required: true
+                      duration:
+                        type: "string"
+                        default: "1h"
+        '401':
+          description: Unauthorized - Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+          description: Overall health status
+        version:
+          type: string
+          description: API version
+        services:
+          type: object
+          properties:
+            api:
+              type: string
+              enum: [running, stopped, error]
+            mcp_server:
+              type: string
+              enum: [running, stopped, error]
+            ai_engine:
+              type: string
+              enum: [running, stopped, error]
+          description: Status of individual services
+
+    HoneypotAnalysisRequest:
+      type: object
+      required:
+        - period
+        - sources
+      properties:
+        period:
+          type: string
+          description: Time period for analysis
+          enum: ["1h", "6h", "12h", "24h", "7d"]
+          example: "1h"
+        sources:
+          type: array
+          items:
+            type: string
+            enum: ["cowrie", "dionaea", "honeytrap"]
+          description: Honeypot sources to analyze
+          minItems: 1
+          example: ["cowrie", "dionaea"]
+        focus_areas:
+          type: array
+          items:
+            type: string
+            enum: ["brute_force", "malware", "reconnaissance", "exploitation", "general"]
+          description: Specific attack types to focus on
+          example: ["brute_force", "malware"]
+
+    NetworkAnalysisRequest:
+      type: object
+      required:
+        - metrics
+        - timeframe
+      properties:
+        metrics:
+          type: array
+          items:
+            type: string
+            enum: ["traffic", "connections", "security_events", "anomalies", "performance"]
+          description: Network metrics to analyze
+          minItems: 1
+          example: ["traffic", "security_events"]
+        timeframe:
+          type: string
+          description: Analysis timeframe
+          enum: ["1h", "6h", "12h", "24h", "7d"]
+          example: "1h"
+        focus:
+          type: string
+          description: Analysis focus area
+          enum: ["threats", "performance", "general"]
+          example: "threats"
+
+    QueryRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Natural language question about security or network status
+          minLength: 5
+          maxLength: 500
+          example: "What are the most common attack patterns in the last 24 hours?"
+
+    AnalysisResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Whether the analysis completed successfully
+        analysis:
+          type: object
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+              description: When the analysis was performed
+            timeframe:
+              type: string
+              description: Time period analyzed
+            ai_analysis:
+              type: string
+              description: AI-generated analysis and insights
+            raw_data:
+              type: object
+              description: Raw data used for analysis
+            focus_areas:
+              type: array
+              items:
+                type: string
+              description: Areas of focus in the analysis
+        timestamp:
+          type: string
+          format: date-time
+          description: Response timestamp
+        metadata:
+          type: object
+          description: Additional metadata about the analysis
+
+    QueryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Whether the query was processed successfully
+        answer:
+          type: string
+          description: AI-generated answer to the query
+        timestamp:
+          type: string
+          format: date-time
+          description: When the query was processed
+        sources:
+          type: array
+          items:
+            type: string
+          description: Data sources used to answer the query
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Confidence level of the answer
+
+    McpToolsResponse:
+      type: object
+      properties:
+        tools:
+          type: array
+          items:
+            $ref: '#/components/schemas/McpTool'
+
+    McpTool:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Tool name
+        description:
+          type: string
+          description: Tool description
+        parameters:
+          type: object
+          description: Tool parameters schema
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code
+        timestamp:
+          type: string
+          format: date-time
+          description: When the error occurred
+
+tags:
+  - name: Health
+    description: Service health and status endpoints
+  - name: Analysis
+    description: Security analysis endpoints
+  - name: Query
+    description: Natural language query endpoints
+  - name: MCP
+    description: Model Context Protocol endpoints
+
+externalDocs:
+  description: Network Security Monitor Documentation
+  url: https://github.com/garrigueta/network-security-monitor/blob/main/README.md

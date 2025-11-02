@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  ai-agent:
+    build: .
+    container_name: network-security-ai-agent
+    ports:
+      - "8080:8080"  # FastAPI
+      - "8081:8081"  # MCP Server
+    environment:
+      - MONITORING_HOST=192.168.1.135
+      - OLLAMA_HOST=192.168.1.132
+      - OLLAMA_MODEL=qwen3:30b
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./.env:/app/.env:ro
+    networks:
+      - ai-agent
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  ai-agent:
+    driver: bridge

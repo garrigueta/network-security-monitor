@@ -116,10 +116,12 @@ services:
       - ./grafana/dashboards/zeek-ssd-storage.json:/etc/grafana/dashboards/zeek-ssd-storage.json:ro
       - ./grafana/dashboards/zeek-ssl-tls-analysis.json:/etc/grafana/dashboards/zeek-ssl-tls-analysis.json:ro
       - ./grafana/dashboards/honeypot-attack-overview.json:/etc/grafana/dashboards/honeypot-attack-overview.json:ro
+      - ./grafana/dashboards/ai-security-reports.json:/etc/grafana/dashboards/ai-security-reports.json:ro
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=marcusolsson-json-datasource
     ports:
       - "3000:3000"
     networks:
