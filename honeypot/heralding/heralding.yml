@@ -1,0 +1,72 @@
+---
+# Heralding configuration for network security monitor
+
+# File logging configuration
+logging:
+  file: /var/log/heralding/auth.log
+
+# Enabled capabilities
+capabilities:
+  - ftp
+  - http
+  - https
+  - imap
+  - imaps
+  - mysql
+  - pop3
+  - pop3s
+  - postgresql
+  - rdp
+  - smtp
+  - smtps
+  - socks5
+  - ssh
+  - telnet
+  - vnc
+
+# FTP Configuration
+ftp:
+  enabled: true
+  port: 21
+  banner: FTP Server Ready
+
+# HTTP Configuration  
+http:
+  enabled: true
+  port: 80
+  banner: Apache/2.4.41
+
+# HTTPS Configuration
+https:
+  enabled: true
+  port: 443
+  
+# MySQL Configuration
+mysql:
+  enabled: true
+  port: 3306
+  version: 5.5.43-0ubuntu0.14.04.1
+
+# PostgreSQL Configuration
+postgresql:
+  enabled: true
+  port: 5432
+  version: 9.3.6
+
+# SSH Configuration
+ssh:
+  enabled: true
+  port: 22
+  banner: SSH-2.0-OpenSSH_7.4
+
+# Telnet Configuration
+telnet:
+  enabled: true
+  port: 23
+  banner: Ubuntu 18.04 LTS
+
+# SMTP Configuration
+smtp:
+  enabled: true
+  port: 25
+  banner: ESMTP Postfix

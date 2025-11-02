@@ -8,34 +8,42 @@ services:
       - "2222:2222"    # SSH honeypot
       - "2223:2223"    # Telnet honeypot
     volumes:
-      - cowrie-logs:/cowrie/cowrie-git/var/log/cowrie
+      - /mnt/ssd-logs/honeypot-logs/cowrie:/cowrie/cowrie-git/var/log/cowrie
       - cowrie-downloads:/cowrie/cowrie-git/var/lib/cowrie/downloads
       - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
     networks:
       - honeypot
     restart: unless-stopped
 
-  # Dionaea Malware Honeypot - DISABLED (not ARM64 compatible)
-  # dionaea:
-  #   image: dinotools/dionaea:latest
-  #   container_name: dionaea
-  #   hostname: honeypot-malware
-  #   ports:
-  #     - "21:21"      # FTP
-  #     - "42:42"      # WINS
-  #     - "135:135"    # MS-RPC
-  #     - "445:445"    # SMB
-  #     - "1433:1433"  # MSSQL
-  #     - "3306:3306"  # MySQL
-  #     - "5060:5060"  # SIP
-  #     - "5061:5061"  # SIP-TLS
-  #   volumes:
-  #     - dionaea-logs:/opt/dionaea/var/log
-  #     - dionaea-binaries:/opt/dionaea/var/lib/dionaea/binaries
-  #     - ./dionaea/dionaea.cfg:/opt/dionaea/etc/dionaea/dionaea.cfg:ro
-  #   networks:
-  #     - honeypot
-  #   restart: unless-stopped
+  # Heralding - Multi-protocol credential honeypot (ARM64 compatible)
+  heralding:
+    image: heywoodlh/heralding:latest
+    container_name: heralding
+    hostname: honeypot-services
+    ports:
+      - "21:21"      # FTP
+      - "23:23"      # Telnet  
+      - "25:25"      # SMTP
+      - "80:80"      # HTTP
+      - "110:110"    # POP3
+      - "143:143"    # IMAP
+      - "443:443"    # HTTPS
+      - "993:993"    # IMAPS
+      - "995:995"    # POP3S
+      - "1080:1080"  # SOCKS5
+      - "3306:3306"  # MySQL
+      - "5432:5432"  # PostgreSQL
+      - "5900:5900"  # VNC
+    volumes:
+      - /mnt/ssd-logs/honeypot-logs/heralding:/var/log/heralding
+    networks:
+      - honeypot
+    restart: unless-stopped
+    command: >
+      bash -c "ln -sf /var/log/heralding/log_auth.csv /log_auth.csv &&
+               ln -sf /var/log/heralding/log_session.csv /log_session.csv &&
+               ln -sf /var/log/heralding/log_session.json /log_session.json &&
+               heralding"
 
   # HoneyTrap Network Service Honeypot - DISABLED (not ARM64 compatible)
   # honeytrap:
@@ -58,16 +66,16 @@ services:
     command: -config.file=/etc/promtail/promtail-config.yml
     volumes:
       - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
-      - cowrie-logs:/var/log/cowrie:ro
-      # - dionaea-logs:/var/log/dionaea:ro
+      - /mnt/ssd-logs/honeypot-logs/cowrie:/var/log/cowrie:ro
+      - /mnt/ssd-logs/honeypot-logs/heralding:/var/log/heralding:ro
       # - honeytrap-logs:/var/log/honeytrap:ro
-      - promtail-positions:/var/lib/promtail
+      - /mnt/ssd-logs/promtail-positions:/var/lib/promtail
     networks:
       - honeypot
       - monitoring_monitoring
     depends_on:
       - cowrie
-      # - dionaea
+      - heralding
     restart: unless-stopped
     environment:
       - LOKI_URL=${LOKI_URL:-http://192.168.1.100:3100}
@@ -100,7 +108,6 @@ networks:
 volumes:
   cowrie-logs:
   cowrie-downloads:
-  dionaea-logs:
-  dionaea-binaries:
+  heralding-logs:
   honeytrap-logs:
   promtail-positions:

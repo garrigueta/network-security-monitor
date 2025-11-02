@@ -19,7 +19,19 @@ class DataCollector:
         self.http_client = httpx.AsyncClient(timeout=30.0)
     
     async def get_honeypot_logs(self, hours: int = 24, limit: int = 100) -> List[Dict[str, Any]]:
-        """Get honeypot logs from Loki"""
+        """Get honeypot logs from Loki or local filesystem"""
+        logs = []
+        
+        try:
+            # Try reading from local filesystem first
+            local_logs = await self.get_local_honeypot_logs(hours)
+            if local_logs:
+                logger.info(f"Retrieved {len(local_logs)} honeypot logs from local filesystem")
+                logs.extend(local_logs)
+        except Exception as e:
+            logger.warning(f"Could not read local honeypot logs: {e}")
+        
+        # Also try Loki as secondary source
         try:
             # Calculate time range
             end_time = datetime.now()
@@ -45,7 +57,6 @@ class DataCollector:
             response.raise_for_status()
             
             data = response.json()
-            logs = []
             
             if data.get("status") == "success" and data.get("data", {}).get("result"):
                 for stream in data["data"]["result"]:
@@ -63,13 +74,14 @@ class DataCollector:
                                 "message": log_line,
                                 "raw": True
                             })
-            
-            logger.info(f"Retrieved {len(logs)} honeypot log entries")
-            return logs
+                
+                logger.info(f"Retrieved {len(data['data']['result'])} additional honeypot log entries from Loki")
             
         except Exception as e:
-            logger.error(f"Error fetching honeypot logs: {e}")
-            return []
+            logger.warning(f"Error fetching honeypot logs from Loki: {e}")
+        
+        logger.info(f"Total honeypot logs retrieved: {len(logs)}")
+        return logs[:limit] if limit else logs
     
     async def get_prometheus_metrics(self, metric: str, duration: str = "1h") -> Dict[str, Any]:
         """Get metrics from Prometheus"""
@@ -353,6 +365,118 @@ class DataCollector:
             return "Asia"
         else:
             return "Unknown"
+    
+    async def get_local_honeypot_logs(self, hours: int = 24) -> List[Dict[str, Any]]:
+        """Read honeypot logs directly from local filesystem"""
+        logs = []
+        
+        try:
+            import os
+            import csv
+            from pathlib import Path
+            
+            honeypot_base = Path("/mnt/honeypot-logs")
+            
+            # Read Cowrie JSON logs
+            cowrie_log = honeypot_base / "cowrie" / "cowrie.json"
+            if cowrie_log.exists():
+                logger.info(f"Reading Cowrie logs from {cowrie_log}")
+                with open(cowrie_log, 'r') as f:
+                    for line in f:
+                        try:
+                            log_entry = json.loads(line.strip())
+                            log_entry["source"] = "cowrie"
+                            logs.append(log_entry)
+                        except json.JSONDecodeError:
+                            continue
+            
+            # Read Heralding CSV logs
+            heralding_auth = honeypot_base / "heralding" / "log_auth.csv"
+            if heralding_auth.exists():
+                logger.info(f"Reading Heralding auth logs from {heralding_auth}")
+                with open(heralding_auth, 'r') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        row["source"] = "heralding"
+                        row["type"] = "auth"
+                        logs.append(row)
+            
+            # Read Heralding session logs
+            heralding_session = honeypot_base / "heralding" / "log_session.csv"
+            if heralding_session.exists():
+                logger.info(f"Reading Heralding session logs from {heralding_session}")
+                with open(heralding_session, 'r') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        row["source"] = "heralding"
+                        row["type"] = "session"
+                        logs.append(row)
+            
+            # Read Heralding JSON logs
+            heralding_json = honeypot_base / "heralding" / "log_session.json"
+            if heralding_json.exists() and os.path.getsize(heralding_json) > 0:
+                logger.info(f"Reading Heralding JSON logs from {heralding_json}")
+                with open(heralding_json, 'r') as f:
+                    for line in f:
+                        try:
+                            log_entry = json.loads(line.strip())
+                            log_entry["source"] = "heralding"
+                            logs.append(log_entry)
+                        except json.JSONDecodeError:
+                            continue
+            
+            logger.info(f"Retrieved {len(logs)} honeypot log entries from local filesystem")
+            return logs
+            
+        except Exception as e:
+            logger.error(f"Error reading local honeypot logs: {e}")
+            return []
+    
+    async def get_local_zeek_logs(self, log_types: List[str] = None, hours: int = 24) -> Dict[str, List[Dict[str, Any]]]:
+        """Read Zeek logs directly from local filesystem"""
+        zeek_logs = {}
+        
+        try:
+            from pathlib import Path
+            
+            if log_types is None:
+                log_types = ["conn", "dns", "http", "ssl", "ssh"]
+            
+            zeek_base = Path("/mnt/zeek-logs/logs/current")
+            
+            for log_type in log_types:
+                log_file = zeek_base / f"{log_type}.log"
+                if log_file.exists():
+                    logger.info(f"Reading Zeek {log_type} logs from {log_file}")
+                    entries = []
+                    
+                    with open(log_file, 'r') as f:
+                        for line in f:
+                            # Skip comments and empty lines
+                            if line.startswith('#') or not line.strip():
+                                continue
+                            
+                            try:
+                                # Parse TSV format
+                                values = line.strip().split('\t')
+                                # Basic parsing - would need proper field mapping
+                                entry = {
+                                    "raw": line.strip(),
+                                    "log_type": log_type,
+                                    "source": "zeek"
+                                }
+                                entries.append(entry)
+                            except Exception:
+                                continue
+                    
+                    zeek_logs[log_type] = entries
+                    logger.info(f"Retrieved {len(entries)} entries from {log_type}.log")
+            
+            return zeek_logs
+            
+        except Exception as e:
+            logger.error(f"Error reading local Zeek logs: {e}")
+            return {}
     
     async def close(self):
         """Close HTTP client"""

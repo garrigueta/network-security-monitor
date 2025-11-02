@@ -28,3 +28,22 @@ scrape_configs:
           job: honeypot
           service: cowrie
           __path__: /var/log/cowrie/*.json
+
+  # Heralding multi-protocol honeypot logs
+  - job_name: honeypot-heralding
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: honeypot
+          service: heralding
+          __path__: /var/log/heralding/*.csv
+  
+  - job_name: honeypot-heralding-json
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: honeypot
+          service: heralding
+          __path__: /var/log/heralding/*.json

@@ -14,6 +14,8 @@ services:
       - LOG_LEVEL=INFO
     volumes:
       - ./.env:/app/.env:ro
+      - /mnt/ssd-logs/zeek-logs:/mnt/zeek-logs:ro
+      - /mnt/ssd-logs/honeypot-logs:/mnt/honeypot-logs:ro
     networks:
       - ai-agent
     restart: unless-stopped
