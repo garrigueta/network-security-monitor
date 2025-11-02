@@ -1,4 +1,4 @@
-# Attack Simulator Configuration
+# Security Test Simulator Configuration
 target:
   host: "192.168.1.135"  # Honeypot host
   ports:
@@ -17,7 +17,7 @@ target:
     postgresql: 5432
     vnc: 5900
 
-# Attack scenarios
+# Test scenarios
 scenarios:
   - name: "ssh_bruteforce"
     protocol: "ssh"
@@ -79,7 +79,7 @@ scenarios:
     attempts: 5
     delay: 1
 
-# Attack patterns
+# Test patterns
 patterns:
   ssh:
     usernames: ["root", "admin", "user", "test", "ubuntu", "pi"]
@@ -147,7 +147,7 @@ patterns:
 
 # Simulation options
 simulation:
-  randomize_order: true  # Randomize attack order
+  randomize_order: true  # Randomize test order
   randomize_timing: true  # Add jitter to delays
   max_jitter: 3  # Max seconds to add to delays
   fake_user_agents: true  # Use random user agents for HTTP

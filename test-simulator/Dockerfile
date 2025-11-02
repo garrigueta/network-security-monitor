@@ -7,7 +7,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application
-COPY attack_simulator.py .
+COPY main.py .
+COPY simulator/ ./simulator/
 COPY config.yaml .
 
 # Create results directory
@@ -18,4 +19,4 @@ RUN useradd -m -u 1000 attacker && chown -R attacker:attacker /app
 USER attacker
 
 # Default command
-CMD ["python", "attack_simulator.py"]
+CMD ["python", "main.py"]
