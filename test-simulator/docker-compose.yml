@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  attack-simulator:
+  security-test-simulator:
     build: .
-    container_name: attack-simulator
+    container_name: security-test-simulator
     volumes:
       - ./results:/app/results
       - ./config.yaml:/app/config.yaml:ro

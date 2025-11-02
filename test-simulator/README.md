@@ -1,23 +1,23 @@
-# Advanced Attack Simulator
+# Advanced Security Test Simulator
 
-A sophisticated multi-protocol attack simulator designed to test honeypot detection systems and validate security monitoring capabilities.
+A sophisticated multi-protocol security test simulator designed to validate honeypot detection systems and test security monitoring capabilities.
 
 ## Features
 
 ### Supported Protocols
-- **SSH** (Port 2222) - Brute force attacks with common credentials
+- **SSH** (Port 2222) - Brute force testing with common credentials
 - **Telnet** (Port 2223) - Connection attempts and banner grabbing
-- **FTP** (Port 21) - Anonymous and authenticated access attempts
+- **FTP** (Port 21) - Anonymous and authenticated access tests
 - **HTTP** (Port 80) - Path scanning, directory traversal, vulnerability probing
 - **HTTPS** (Port 443) - SSL/TLS connection testing
 - **SMTP** (Port 25) - Email server enumeration
-- **MySQL** (Port 3306) - Database brute force
-- **PostgreSQL** (Port 5432) - Database connection attempts
+- **MySQL** (Port 3306) - Database brute force testing
+- **PostgreSQL** (Port 5432) - Database connection tests
 - **DNS** (Port 53) - DNS tunneling and suspicious domain queries
 - **Port Scanning** - TCP SYN scans across common/suspicious ports
 - **Malformed Packets** - Generates Zeek "weird" events
 
-### Attack Scenarios
+### Test Scenarios
 1. **SSH Brute Force** - Tests common username/password combinations
 2. **Telnet Scanning** - Automated login attempts
 3. **FTP Anonymous Access** - Tests for anonymous FTP access
@@ -35,20 +35,20 @@ A sophisticated multi-protocol attack simulator designed to test honeypot detect
 
 ### Advanced Features
 - ⏱️ **Randomized Timing** - Adds jitter to simulate human-like behavior
-- 🎭 **Fake User Agents** - Random browser identification including attack tools (sqlmap, Nikto, Metasploit)
+- 🎭 **Fake User Agents** - Random browser identification including security tools (sqlmap, Nikto, Metasploit)
 - 📊 **Detailed Logging** - Color-coded output with timestamps
-- 💾 **Result Persistence** - Saves attack results to JSON files
-- 🔀 **Randomized Order** - Varies attack sequences to avoid patterns
+- 💾 **Result Persistence** - Saves test results to JSON files
+- 🔀 **Randomized Order** - Varies test sequences to avoid patterns
 - 🎯 **Configurable Scenarios** - YAML-based configuration for easy customization
 - 🌐 **DNS Events** - Generates suspicious DNS queries for SIEM/IDS detection
 - 🔍 **Network Anomalies** - Creates weird packets that trigger Zeek alerts
-- 🎲 **Dynamic Data** - Uses Faker library for realistic attack patterns
+- 🎲 **Dynamic Data** - Uses Faker library for realistic test patterns
 - 🚨 **Multi-Layer Detection** - Tests honeypot, DNS monitoring, Zeek, and network IDS
 
 ## Installation
 
 ```bash
-cd /home/gueta/network-security-monitor/attack-simulator
+cd /home/gueta/network-security-monitor/test-simulator
 
 # Build the Docker image
 make build
@@ -78,7 +78,7 @@ scenarios:
 
 ### Quick Start with Make
 ```bash
-# Run attack simulation
+# Run test simulation
 make run
 
 # View logs in real-time
@@ -106,7 +106,7 @@ docker compose logs -f
 docker compose down
 ```
 
-### Customize Attack Scenarios
+### Customize Test Scenarios
 Edit `config.yaml` and set `enabled: false` for scenarios you want to skip:
 
 ```yaml
@@ -115,7 +115,7 @@ scenarios:
     enabled: false  # Skip this one
 ```
 
-### Customize Attack Patterns
+### Customize Test Patterns
 Modify the `patterns` section in `config.yaml`:
 
 ```yaml
@@ -134,14 +134,14 @@ make build
 
 ### Console Output
 ```
-2025-11-02 14:45:23 - INFO - Attack Simulator initialized
+2025-11-02 14:45:23 - INFO - Security Test Simulator initialized
 2025-11-02 14:45:23 - INFO - Target: 192.168.1.135
 2025-11-02 14:45:25 - INFO - [SSH] FAILED - 192.168.1.135:2222 (user: root) - Authentication failed
 2025-11-02 14:45:28 - INFO - [FTP] SUCCESS - 192.168.1.135:21 (user: anonymous)
 ```
 
 ### JSON Results
-Results are saved to `./results/attack_results_YYYYMMDD_HHMMSS.json`:
+Results are saved to `./results/test_results_YYYYMMDD_HHMMSS.json`:
 
 ```json
 {
@@ -162,10 +162,10 @@ Results are saved to `./results/attack_results_YYYYMMDD_HHMMSS.json`:
 The simulator triggers multiple monitoring systems:
 
 ### Honeypot Detection (Cowrie/Heralding)
-✅ SSH brute force attempts  
-✅ Telnet connection attempts  
-✅ FTP authentication failures  
-✅ MySQL/PostgreSQL connection attempts  
+✅ SSH brute force tests  
+✅ Telnet connection tests  
+✅ FTP authentication tests  
+✅ MySQL/PostgreSQL connection tests  
 ✅ All login attempts logged with credentials
 
 ### Zeek Network Monitoring
@@ -179,26 +179,26 @@ The simulator triggers multiple monitoring systems:
 ### Loki Log Aggregation
 ✅ All honeypot events indexed  
 ✅ Searchable by service, IP, protocol  
-✅ Time-series attack patterns  
+✅ Time-series test patterns  
 
 ### Prometheus Metrics
-✅ Attack rate per minute  
+✅ Test rate per minute  
 ✅ Service availability  
-✅ Resource usage during attacks
+✅ Resource usage during testing
 
 ### AI Agent Analysis
 ✅ Pattern recognition (automated tools detected)  
 ✅ Threat level assessment  
-✅ Attack attribution (botnet signatures)  
+✅ Test attribution (tool signatures)  
 ✅ Recommendations generation  
 ✅ Trend analysis over time
 
 ## Integration with AI Agent
 
-The attack simulator generates logs that will be captured by your honeypot and analyzed by the AI agent. This creates a feedback loop:
+The test simulator generates logs that will be captured by your honeypot and analyzed by the AI agent. This creates a feedback loop:
 
-1. **Simulator** → Attacks honeypot
-2. **Honeypot** → Logs attacks to Loki
+1. **Simulator** → Tests honeypot
+2. **Honeypot** → Logs events to Loki
 3. **AI Agent** → Analyzes patterns and generates reports
 4. **Review** → Validate detection accuracy
 5. **Improve** → Adjust detection rules and AI prompts
@@ -206,8 +206,8 @@ The attack simulator generates logs that will be captured by your honeypot and a
 ### Validation Workflow
 
 ```bash
-# 1. Run attack simulation
-python attack_simulator.py
+# 1. Run test simulation
+docker compose up
 
 # 2. Wait for logs to propagate (30 seconds)
 sleep 30
@@ -219,8 +219,8 @@ curl -X POST "http://192.168.1.135:8080/reports/schedule/trigger?level=executive
 # 4. Check AI analysis
 curl -s "http://192.168.1.135:8080/reports/latest/full" | jq -r '.ai_analysis'
 
-# 5. Compare simulator results with detected attacks
-diff results/attack_results_*.json <(curl -s http://192.168.1.135:3100/loki/api/v1/query?query='{job="honeypot"}')
+# 5. Compare simulator results with detected events
+diff results/test_results_*.json <(curl -s http://192.168.1.135:3100/loki/api/v1/query?query='{job="honeypot"}')
 ```
 
 ## Safety Considerations
@@ -235,25 +235,25 @@ diff results/attack_results_*.json <(curl -s http://192.168.1.135:3100/loki/api/
 
 ## Advanced Options
 
-### Custom Attack Sequences
-Create custom attack scripts by extending the `AttackSimulator` class:
+### Custom Test Sequences
+Create custom test scripts by extending the test classes:
 
 ```python
-async def custom_attack(self) -> AttackResult:
-    # Your custom attack logic
+async def custom_test(self) -> TestResult:
+    # Your custom test logic
     pass
 ```
 
-### Scheduled Attacks
+### Scheduled Tests
 Use cron with Docker:
 
 ```bash
 # Run every hour
-0 * * * * cd /home/gueta/network-security-monitor/attack-simulator && docker compose up
+0 * * * * cd /home/gueta/network-security-monitor/test-simulator && docker compose up
 ```
 
-### Distributed Attacks
-Run containers on different machines to simulate distributed attacks:
+### Distributed Tests
+Run containers on different machines to simulate distributed testing:
 
 ```bash
 # On machine 1
@@ -289,7 +289,7 @@ docker compose logs
 To add support for new protocols:
 
 1. Add protocol configuration to `config.yaml`
-2. Implement attack method in `AttackSimulator` class
+2. Create a new test class in `simulator/tests/`
 3. Add scenario to scenarios list
 4. Test and document
 
