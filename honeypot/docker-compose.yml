@@ -15,41 +15,41 @@ services:
       - honeypot
     restart: unless-stopped
 
-  # Dionaea Malware Honeypot
-  dionaea:
-    image: dinotools/dionaea:latest
-    container_name: dionaea
-    hostname: honeypot-malware
-    ports:
-      - "21:21"      # FTP
-      - "42:42"      # WINS
-      - "135:135"    # MS-RPC
-      - "445:445"    # SMB
-      - "1433:1433"  # MSSQL
-      - "3306:3306"  # MySQL
-      - "5060:5060"  # SIP
-      - "5061:5061"  # SIP-TLS
-    volumes:
-      - dionaea-logs:/opt/dionaea/var/log
-      - dionaea-binaries:/opt/dionaea/var/lib/dionaea/binaries
-      - ./dionaea/dionaea.cfg:/opt/dionaea/etc/dionaea/dionaea.cfg:ro
-    networks:
-      - honeypot
-    restart: unless-stopped
+  # Dionaea Malware Honeypot - DISABLED (not ARM64 compatible)
+  # dionaea:
+  #   image: dinotools/dionaea:latest
+  #   container_name: dionaea
+  #   hostname: honeypot-malware
+  #   ports:
+  #     - "21:21"      # FTP
+  #     - "42:42"      # WINS
+  #     - "135:135"    # MS-RPC
+  #     - "445:445"    # SMB
+  #     - "1433:1433"  # MSSQL
+  #     - "3306:3306"  # MySQL
+  #     - "5060:5060"  # SIP
+  #     - "5061:5061"  # SIP-TLS
+  #   volumes:
+  #     - dionaea-logs:/opt/dionaea/var/log
+  #     - dionaea-binaries:/opt/dionaea/var/lib/dionaea/binaries
+  #     - ./dionaea/dionaea.cfg:/opt/dionaea/etc/dionaea/dionaea.cfg:ro
+  #   networks:
+  #     - honeypot
+  #   restart: unless-stopped
 
-  # HoneyTrap Network Service Honeypot
-  honeytrap:
-    image: honeytrap/honeytrap:latest
-    container_name: honeytrap
-    hostname: honeypot-services
-    network_mode: host
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-    volumes:
-      - honeytrap-logs:/var/log/honeytrap
-      - ./honeytrap/honeytrap.yml:/etc/honeytrap/honeytrap.yml:ro
-    restart: unless-stopped
+  # HoneyTrap Network Service Honeypot - DISABLED (not ARM64 compatible)
+  # honeytrap:
+  #   image: honeytrap/honeytrap:latest
+  #   container_name: honeytrap
+  #   hostname: honeypot-services
+  #   network_mode: host
+  #   cap_add:
+  #     - NET_ADMIN
+  #     - NET_RAW
+  #   volumes:
+  #     - honeytrap-logs:/var/log/honeytrap
+  #     - ./honeytrap/honeytrap.yml:/etc/honeytrap/honeytrap.yml:ro
+  #   restart: unless-stopped
 
   # Promtail - Ship logs to central Loki
   promtail:
@@ -59,14 +59,15 @@ services:
     volumes:
       - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
       - cowrie-logs:/var/log/cowrie:ro
-      - dionaea-logs:/var/log/dionaea:ro
-      - honeytrap-logs:/var/log/honeytrap:ro
+      # - dionaea-logs:/var/log/dionaea:ro
+      # - honeytrap-logs:/var/log/honeytrap:ro
       - promtail-positions:/var/lib/promtail
     networks:
       - honeypot
+      - monitoring_monitoring
     depends_on:
       - cowrie
-      - dionaea
+      # - dionaea
     restart: unless-stopped
     environment:
       - LOKI_URL=${LOKI_URL:-http://192.168.1.100:3100}
@@ -93,6 +94,8 @@ services:
 networks:
   honeypot:
     driver: bridge
+  monitoring_monitoring:
+    external: true
 
 volumes:
   cowrie-logs:

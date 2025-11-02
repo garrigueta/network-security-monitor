@@ -62,17 +62,6 @@ class ReportScheduler:
             misfire_grace_time=3600
         )
         self._jobs["cleanup_reports"] = "Daily cleanup of old reports"
-        
-        # Schedule 5-minute status reports
-        self.scheduler.add_job(
-            self._generate_status_report,
-            trigger=IntervalTrigger(minutes=5),
-            id="status_report_5min",
-            name="Status Report (5 minutes)",
-            misfire_grace_time=60,
-            max_instances=1
-        )
-        self._jobs["status_report_5min"] = "Status monitoring every 5 minutes"
     
     async def _schedule_report_level(self, level: ReportLevel, frequency: ReportFrequency):
         """Schedule reports for a specific level and frequency"""
@@ -152,23 +141,6 @@ class ReportScheduler:
             
         except Exception as e:
             logger.error(f"Failed to generate critical alert: {e}")
-    
-    async def _generate_status_report(self):
-        """Generate a lightweight 5-minute status report"""
-        try:
-            logger.info("Generating 5-minute status report")
-            
-            # Generate a lightweight executive status report
-            report = await self.report_generator.generate_report(
-                level=ReportLevel.EXECUTIVE,
-                period_hours=1,  # Look at last hour for status
-                focus_areas=["system_health", "security_status"]
-            )
-            
-            logger.info(f"5-minute status report generated: {report.metadata.id}")
-            
-        except Exception as e:
-            logger.error(f"Failed to generate 5-minute status report: {e}")
     
     async def _cleanup_old_reports(self):
         """Clean up old reports based on retention policy"""

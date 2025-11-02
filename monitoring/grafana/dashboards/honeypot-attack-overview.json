@@ -53,7 +53,7 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum by (filename) (count_over_time({job=\"honeypot\"}[$__range]))",
+          "expr": "sum by (service) (count_over_time({job=\"honeypot\"}[$__range]))",
           "refId": "A"
         }
       ],
@@ -277,8 +277,8 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum by (filename) (count_over_time({job=\"honeypot\"}[5m]))",
-          "legendFormat": "{{honeypot_type}}",
+          "expr": "sum by (service) (count_over_time({job=\"honeypot\"}[5m]))",
+          "legendFormat": "{{service}}",
           "refId": "A"
         }
       ],
