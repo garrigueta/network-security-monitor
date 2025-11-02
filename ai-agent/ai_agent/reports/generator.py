@@ -164,22 +164,27 @@ class ReportGenerator:
         # Get network metrics
         network_data = await self.data_sources.get_prometheus_metrics("security_events", "24h")
         
-        # Generate AI analysis
-        prompt = f"""
-        Generate an executive security summary for the period {metadata.period_start} to {metadata.period_end}.
-        
-        Honeypot Data: {str(honeypot_data)[:1000]}...
-        Network Data: {str(network_data)[:1000]}...
-        
-        Provide:
-        1. Overall security score (0-100)
-        2. Current threat level (LOW/MEDIUM/HIGH/CRITICAL)
-        3. Top 3-5 key findings for executives
-        4. Strategic recommendations
-        5. Trend analysis
-        
-        Focus on business impact and strategic insights.
-        """
+        # Generate AI analysis with simpler, more direct prompt
+        prompt = f"""Create a brief executive security summary for {metadata.period_start.strftime('%Y-%m-%d %H:%M')} to {metadata.period_end.strftime('%Y-%m-%d %H:%M')}.
+
+Honeypot events: {len(honeypot_data) if honeypot_data else 0} total
+Network alerts: {str(network_data)[:300] if network_data else 'none'}
+
+Provide your analysis in this format:
+
+SECURITY SCORE: [number 0-100]
+THREAT LEVEL: [LOW/MEDIUM/HIGH/CRITICAL]
+KEY FINDINGS:
+- [finding 1]
+- [finding 2]  
+- [finding 3]
+RECOMMENDATIONS:
+- [recommendation 1]
+- [recommendation 2]
+TRENDS:
+[brief trend analysis]
+
+Keep the response concise and direct."""
         
         ai_analysis = await self.ai_engine._query_ollama(prompt, "executive")
         

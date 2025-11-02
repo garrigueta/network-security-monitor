@@ -28,6 +28,21 @@ class AIEngine:
         # Use centralized system prompt
         self.system_prompt = prompt_templates.SYSTEM_PROMPT
     
+    def _truncate_data(self, data: str, max_length: int = 5000) -> str:
+        """Intelligently truncate data while preserving structure"""
+        if len(data) <= max_length:
+            return data
+        
+        # Try to find a good breaking point (end of line, paragraph, etc.)
+        truncated = data[:max_length]
+        
+        # Find last newline or sentence
+        last_newline = truncated.rfind('\n')
+        if last_newline > max_length * 0.8:  # If we can save 80% of content
+            truncated = truncated[:last_newline]
+        
+        return truncated + f"\n\n[... {len(data) - len(truncated)} more characters truncated ...]"
+    
     async def initialize(self):
         """Initialize the AI engine"""
         try:
@@ -68,6 +83,10 @@ class AIEngine:
             )
             
             threat_patterns = patterns_result[0]["text"] if patterns_result else "No threat patterns found"
+            
+            # Truncate large data sets to avoid overwhelming the model
+            honeypot_data = self._truncate_data(honeypot_data, max_length=4000)
+            threat_patterns = self._truncate_data(threat_patterns, max_length=2000)
             
             # Create analysis prompt using template
             prompt = prompt_templates.get_honeypot_prompt(
@@ -261,14 +280,30 @@ class AIEngine:
         # Get parameters for this analysis type
         params = PromptConfig.get_params(analysis_type)
         
+        # Truncate very long prompts to avoid issues
+        max_prompt_length = 8000  # Conservative limit
+        full_prompt = f"{self.system_prompt}\n\n{prompt}"
+        
+        if len(full_prompt) > max_prompt_length:
+            logger.warning(f"Prompt too long ({len(full_prompt)} chars), truncating to {max_prompt_length}")
+            full_prompt = full_prompt[:max_prompt_length] + "\n\n[Content truncated due to length]"
+        
         payload = {
             "model": settings.ollama_model,
-            "prompt": f"{self.system_prompt}\n\n{prompt}",
+            "prompt": full_prompt,
             "stream": False,
             "options": {
                 "temperature": params.get("temperature", 0.7),
                 "top_p": params.get("top_p", 0.9),
-                "num_predict": params.get("max_tokens", 2048)
+                "top_k": params.get("top_k", 40),
+                "num_predict": params.get("max_tokens", 2048),
+                "num_ctx": 4096,  # Context window
+                "repeat_penalty": 1.1,
+                "seed": -1,  # Random seed for variability
+                "stop": ["<|endoftext|>", "<|im_end|>"],  # Stop sequences
+                # Disable thinking mode that consumes tokens
+                "penalize_newline": False,
+                "mirostat": 0  # Disable mirostat for more predictable output
             }
         }
         
@@ -283,6 +318,7 @@ class AIEngine:
         for attempt in range(max_retries):
             try:
                 logger.info(f"Querying Ollama at {settings.ollama_url} with model {settings.ollama_model} (attempt {attempt + 1}/{max_retries})")
+                logger.debug(f"Prompt length: {len(full_prompt)} chars, max_tokens: {payload['options']['num_predict']}")
                 
                 response = await self.http_client.post(
                     f"{settings.ollama_url}/api/generate",
@@ -291,15 +327,38 @@ class AIEngine:
                 
                 if response.status_code == 200:
                     result = response.json()
-                    ai_response = result.get("response", "")
+                    ai_response = result.get("response", "").strip()
+                    
+                    # Debug log the result structure
+                    logger.debug(f"Ollama result keys: {list(result.keys())}")
+                    logger.debug(f"Done: {result.get('done')}, Context length: {len(result.get('context', []))}")
+                    
                     if ai_response:
                         logger.info(f"Successfully received response from Ollama ({len(ai_response)} chars)")
+                        
+                        # Validate response is not just whitespace or error message
+                        if len(ai_response) < 50 and any(word in ai_response.lower() for word in ['error', 'failed', 'unavailable']):
+                            logger.warning(f"Received suspiciously short response: {ai_response}")
+                            if attempt < max_retries - 1:
+                                logger.info(f"Retrying in {retry_delay} seconds...")
+                                await asyncio.sleep(retry_delay)
+                                retry_delay *= 2
+                                continue
+                        
                         return ai_response
                     else:
-                        logger.warning("Empty response from Ollama")
-                        return "AI model returned an empty response"
+                        logger.warning(f"Empty response from Ollama. Full result: {result}")
+                        if attempt < max_retries - 1:
+                            logger.info(f"Retrying with adjusted parameters in {retry_delay} seconds...")
+                            # Adjust parameters for retry
+                            payload["options"]["temperature"] = 0.8
+                            payload["options"]["num_predict"] = min(1024, payload["options"]["num_predict"])
+                            await asyncio.sleep(retry_delay)
+                            retry_delay *= 2
+                            continue
+                        return "AI model returned an empty response after multiple attempts. Try again or check model health."
                 else:
-                    logger.error(f"Ollama API error: {response.status_code} - {response.text}")
+                    logger.error(f"Ollama API error: {response.status_code} - {response.text[:200]}")
                     if attempt < max_retries - 1:
                         await asyncio.sleep(retry_delay)
                         retry_delay *= 2  # Exponential backoff
