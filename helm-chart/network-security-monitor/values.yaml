@@ -1,0 +1,278 @@
+# Default values for network-security-monitor
+# This is a YAML-formatted file.
+
+# Global settings
+global:
+  # Image registry settings
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: "local-path"
+  
+# Namespace to deploy to
+namespace: network-security
+
+# Monitoring stack configuration
+monitoring:
+  enabled: true
+  
+  # Prometheus configuration
+  prometheus:
+    enabled: true
+    image:
+      repository: prom/prometheus
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+    retention: "30d"
+    storage:
+      size: "20Gi"
+    service:
+      type: ClusterIP
+      port: 9090
+    
+  # Grafana configuration
+  grafana:
+    enabled: true
+    image:
+      repository: grafana/grafana
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    adminUser: admin
+    adminPassword: admin
+    storage:
+      size: "5Gi"
+    service:
+      type: LoadBalancer
+      port: 3000
+    plugins:
+      - marcusolsson-json-datasource
+      
+  # Loki configuration
+  loki:
+    enabled: true
+    image:
+      repository: grafana/loki
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+    storage:
+      size: "20Gi"
+    service:
+      type: ClusterIP
+      port: 3100
+      
+  # Promtail configuration
+  promtail:
+    enabled: true
+    image:
+      repository: grafana/promtail
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+        
+  # Node Exporter configuration
+  nodeExporter:
+    enabled: true
+    image:
+      repository: prom/node-exporter
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+    service:
+      type: ClusterIP
+      port: 9100
+      
+  # Crypto Exporter configuration
+  cryptoExporter:
+    enabled: true
+    image:
+      repository: network-security/crypto-exporter
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+    service:
+      type: ClusterIP
+      port: 9101
+
+# Zeek configuration
+zeek:
+  enabled: true
+  image:
+    repository: network-security/zeek
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+  interface: "eth0"
+  storage:
+    size: "30Gi"
+  hostNetwork: true
+
+# Honeypot stack configuration
+honeypot:
+  enabled: true
+  
+  # Cowrie SSH/Telnet honeypot
+  cowrie:
+    enabled: true
+    image:
+      repository: cowrie/cowrie
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "200m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    service:
+      type: LoadBalancer
+      sshPort: 2222
+      telnetPort: 2223
+      
+  # Heralding multi-protocol honeypot
+  heralding:
+    enabled: true
+    image:
+      repository: heywoodlh/heralding
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+    service:
+      type: LoadBalancer
+      ports:
+        ftp: 21
+        telnet: 23
+        smtp: 25
+        http: 80
+        pop3: 110
+        imap: 143
+        https: 443
+        imaps: 993
+        pop3s: 995
+        socks5: 1080
+        mysql: 3306
+        postgresql: 5432
+        vnc: 5900
+        
+  storage:
+    size: "10Gi"
+
+# AI Agent configuration
+aiAgent:
+  enabled: true
+  image:
+    repository: network-security/ai-agent
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+  service:
+    type: LoadBalancer
+    apiPort: 8080
+    mcpPort: 8081
+  config:
+    monitoringHost: "prometheus.network-security.svc.cluster.local"
+    ollamaHost: "192.168.1.132"
+    ollamaModel: "qwen3:30b"
+    logLevel: "INFO"
+
+# Test Simulator configuration
+testSimulator:
+  enabled: true
+  image:
+    repository: network-security/test-simulator
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  # Run as a job on demand
+  job:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    hostNetwork: true
+    backoffLimit: 3
+    
+# Storage configuration
+storage:
+  # Main data PV
+  persistentVolume:
+    enabled: true
+    size: "100Gi"
+    path: "/mnt/ssd-logs"
+    storageClass: "local-path"
+    
+# Network policies
+networkPolicy:
+  enabled: false
+  
+# Service monitor for Prometheus Operator (if installed)
+serviceMonitor:
+  enabled: false
+  
+# Ingress configuration
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []

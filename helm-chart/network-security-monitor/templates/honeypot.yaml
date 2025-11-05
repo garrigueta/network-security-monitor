@@ -1,0 +1,169 @@
+{{- if .Values.honeypot.cowrie.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cowrie-config
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cowrie
+data:
+  cowrie.cfg: |
+    [honeypot]
+    hostname = honeypot-ssh
+    log_path = /cowrie/cowrie-git/var/log/cowrie
+    download_path = /cowrie/cowrie-git/var/lib/cowrie/downloads
+    contents_path = contents
+    txtcmds_path = txtcmds
+    ttylog_path = /cowrie/cowrie-git/var/lib/cowrie/tty
+    
+    [ssh]
+    enabled = true
+    listen_endpoints = tcp:2222:interface=0.0.0.0
+    
+    [telnet]
+    enabled = true
+    listen_endpoints = tcp:2223:interface=0.0.0.0
+    
+    [output_jsonlog]
+    enabled = true
+    logfile = /cowrie/cowrie-git/var/log/cowrie/cowrie.json
+    
+    [output_textlog]
+    enabled = true
+    logfile = /cowrie/cowrie-git/var/log/cowrie/cowrie.log
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cowrie
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cowrie
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "network-security-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: cowrie
+  template:
+    metadata:
+      labels:
+        {{- include "network-security-monitor.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: cowrie
+    spec:
+      containers:
+      - name: cowrie
+        image: "{{ .Values.global.imageRegistry }}{{ .Values.honeypot.cowrie.image.repository }}:{{ .Values.honeypot.cowrie.image.tag }}"
+        imagePullPolicy: {{ .Values.honeypot.cowrie.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.honeypot.cowrie.service.sshPort }}
+          name: ssh
+        - containerPort: {{ .Values.honeypot.cowrie.service.telnetPort }}
+          name: telnet
+        volumeMounts:
+        - name: logs
+          mountPath: /cowrie/cowrie-git/var/log/cowrie
+        - name: downloads
+          mountPath: /cowrie/cowrie-git/var/lib/cowrie/downloads
+        - name: config
+          mountPath: /cowrie/cowrie-git/etc/cowrie.cfg
+          subPath: cowrie.cfg
+        resources:
+          {{- toYaml .Values.honeypot.cowrie.resources | nindent 10 }}
+      volumes:
+      - name: logs
+        persistentVolumeClaim:
+          claimName: honeypot-logs
+      - name: downloads
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: cowrie-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cowrie
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cowrie
+spec:
+  type: {{ .Values.honeypot.cowrie.service.type }}
+  ports:
+  - name: ssh
+    port: {{ .Values.honeypot.cowrie.service.sshPort }}
+    targetPort: {{ .Values.honeypot.cowrie.service.sshPort }}
+  - name: telnet
+    port: {{ .Values.honeypot.cowrie.service.telnetPort }}
+    targetPort: {{ .Values.honeypot.cowrie.service.telnetPort }}
+  selector:
+    {{- include "network-security-monitor.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: cowrie
+{{- end }}
+
+---
+
+{{- if .Values.honeypot.heralding.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: heralding
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: heralding
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "network-security-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: heralding
+  template:
+    metadata:
+      labels:
+        {{- include "network-security-monitor.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: heralding
+    spec:
+      containers:
+      - name: heralding
+        image: "{{ .Values.global.imageRegistry }}{{ .Values.honeypot.heralding.image.repository }}:{{ .Values.honeypot.heralding.image.tag }}"
+        imagePullPolicy: {{ .Values.honeypot.heralding.image.pullPolicy }}
+        ports:
+        {{- range $name, $port := .Values.honeypot.heralding.service.ports }}
+        - containerPort: {{ $port }}
+          name: {{ $name }}
+        {{- end }}
+        volumeMounts:
+        - name: logs
+          mountPath: /var/log/heralding
+        resources:
+          {{- toYaml .Values.honeypot.heralding.resources | nindent 10 }}
+      volumes:
+      - name: logs
+        persistentVolumeClaim:
+          claimName: honeypot-logs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: heralding
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: heralding
+spec:
+  type: {{ .Values.honeypot.heralding.service.type }}
+  ports:
+  {{- range $name, $port := .Values.honeypot.heralding.service.ports }}
+  - name: {{ $name }}
+    port: {{ $port }}
+    targetPort: {{ $port }}
+  {{- end }}
+  selector:
+    {{- include "network-security-monitor.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: heralding
+{{- end }}

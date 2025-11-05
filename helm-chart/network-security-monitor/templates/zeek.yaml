@@ -1,0 +1,52 @@
+{{- if .Values.zeek.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zeek
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zeek
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "network-security-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: zeek
+  template:
+    metadata:
+      labels:
+        {{- include "network-security-monitor.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: zeek
+    spec:
+      {{- if .Values.zeek.hostNetwork }}
+      hostNetwork: true
+      {{- end }}
+      containers:
+      - name: zeek
+        image: "{{ .Values.global.imageRegistry }}{{ .Values.zeek.image.repository }}:{{ .Values.zeek.image.tag }}"
+        imagePullPolicy: {{ .Values.zeek.image.pullPolicy }}
+        env:
+        - name: ZEEK_INTERFACE
+          value: {{ .Values.zeek.interface }}
+        securityContext:
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_RAW
+        volumeMounts:
+        - name: logs
+          mountPath: /mnt/zeek-logs
+        - name: config
+          mountPath: /usr/local/zeek/share/zeek/site/local.zeek
+          subPath: local.zeek
+        resources:
+          {{- toYaml .Values.zeek.resources | nindent 10 }}
+      volumes:
+      - name: logs
+        persistentVolumeClaim:
+          claimName: zeek-logs
+      - name: config
+        configMap:
+          name: zeek-config
+{{- end }}

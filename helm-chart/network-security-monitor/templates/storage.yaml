@@ -1,0 +1,113 @@
+{{- if .Values.storage.persistentVolume.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "network-security-monitor.fullname" . }}-data-pv
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+spec:
+  capacity:
+    storage: {{ .Values.storage.persistentVolume.size }}
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.storage.persistentVolume.storageClass }}
+  hostPath:
+    path: {{ .Values.storage.persistentVolume.path }}
+{{- end }}
+
+{{- if .Values.monitoring.prometheus.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-data
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.monitoring.prometheus.storage.size }}
+  storageClassName: {{ .Values.global.storageClass }}
+{{- end }}
+
+{{- if .Values.monitoring.loki.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: loki-data
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: loki
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.monitoring.loki.storage.size }}
+  storageClassName: {{ .Values.global.storageClass }}
+{{- end }}
+
+{{- if .Values.monitoring.grafana.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-data
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.monitoring.grafana.storage.size }}
+  storageClassName: {{ .Values.global.storageClass }}
+{{- end }}
+
+{{- if .Values.zeek.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zeek-logs
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zeek
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.zeek.storage.size }}
+  storageClassName: {{ .Values.global.storageClass }}
+{{- end }}
+
+{{- if .Values.honeypot.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: honeypot-logs
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: honeypot
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.honeypot.storage.size }}
+  storageClassName: {{ .Values.global.storageClass }}
+{{- end }}

@@ -1,0 +1,209 @@
+{{- if .Values.monitoring.grafana.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "network-security-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: grafana
+  template:
+    metadata:
+      labels:
+        {{- include "network-security-monitor.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: grafana
+    spec:
+      securityContext:
+        fsGroup: 472
+      initContainers:
+      - name: fix-permissions
+        image: busybox:1.36
+        command: ['sh', '-c', 'chown -R 472:472 /var/lib/grafana && chmod -R 755 /var/lib/grafana']
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/grafana
+        securityContext:
+          runAsUser: 0
+      containers:
+      - name: grafana
+        image: "{{ .Values.global.imageRegistry }}{{ .Values.monitoring.grafana.image.repository }}:{{ .Values.monitoring.grafana.image.tag }}"
+        imagePullPolicy: {{ .Values.monitoring.grafana.image.pullPolicy }}
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          value: {{ .Values.monitoring.grafana.adminUser }}
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          value: {{ .Values.monitoring.grafana.adminPassword }}
+        - name: GF_USERS_ALLOW_SIGN_UP
+          value: "false"
+        - name: GF_INSTALL_PLUGINS
+          value: {{ join "," .Values.monitoring.grafana.plugins }}
+        ports:
+        - containerPort: {{ .Values.monitoring.grafana.service.port }}
+          name: web
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/grafana
+        resources:
+          {{- toYaml .Values.monitoring.grafana.resources | nindent 10 }}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: grafana-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  type: {{ .Values.monitoring.grafana.service.type }}
+  ports:
+  - port: {{ .Values.monitoring.grafana.service.port }}
+    targetPort: {{ .Values.monitoring.grafana.service.port }}
+    name: web
+  selector:
+    {{- include "network-security-monitor.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+{{- end }}
+
+---
+
+{{- if .Values.monitoring.nodeExporter.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: node-exporter
+spec:
+  selector:
+    matchLabels:
+      {{- include "network-security-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: node-exporter
+  template:
+    metadata:
+      labels:
+        {{- include "network-security-monitor.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: node-exporter
+    spec:
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - name: node-exporter
+        image: "{{ .Values.global.imageRegistry }}{{ .Values.monitoring.nodeExporter.image.repository }}:{{ .Values.monitoring.nodeExporter.image.tag }}"
+        imagePullPolicy: {{ .Values.monitoring.nodeExporter.image.pullPolicy }}
+        args:
+          - '--path.procfs=/host/proc'
+          - '--path.sysfs=/host/sys'
+          - '--path.rootfs=/rootfs'
+          - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+        ports:
+        - containerPort: {{ .Values.monitoring.nodeExporter.service.port }}
+          name: metrics
+        volumeMounts:
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: sys
+          mountPath: /host/sys
+          readOnly: true
+        - name: rootfs
+          mountPath: /rootfs
+          readOnly: true
+        resources:
+          {{- toYaml .Values.monitoring.nodeExporter.resources | nindent 10 }}
+      volumes:
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: rootfs
+        hostPath:
+          path: /
+      tolerations:
+      - effect: NoSchedule
+        operator: Exists
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-exporter
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: node-exporter
+spec:
+  type: {{ .Values.monitoring.nodeExporter.service.type }}
+  ports:
+  - port: {{ .Values.monitoring.nodeExporter.service.port }}
+    targetPort: {{ .Values.monitoring.nodeExporter.service.port }}
+    name: metrics
+  selector:
+    {{- include "network-security-monitor.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: node-exporter
+{{- end }}
+
+---
+
+{{- if .Values.monitoring.cryptoExporter.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crypto-exporter
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: crypto-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "network-security-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: crypto-exporter
+  template:
+    metadata:
+      labels:
+        {{- include "network-security-monitor.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: crypto-exporter
+    spec:
+      containers:
+      - name: crypto-exporter
+        image: "{{ .Values.global.imageRegistry }}{{ .Values.monitoring.cryptoExporter.image.repository }}:{{ .Values.monitoring.cryptoExporter.image.tag }}"
+        imagePullPolicy: {{ .Values.monitoring.cryptoExporter.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.monitoring.cryptoExporter.service.port }}
+          name: metrics
+        resources:
+          {{- toYaml .Values.monitoring.cryptoExporter.resources | nindent 10 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crypto-exporter
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: crypto-exporter
+spec:
+  type: {{ .Values.monitoring.cryptoExporter.service.type }}
+  ports:
+  - port: {{ .Values.monitoring.cryptoExporter.service.port }}
+    targetPort: {{ .Values.monitoring.cryptoExporter.service.port }}
+    name: metrics
+  selector:
+    {{- include "network-security-monitor.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: crypto-exporter
+{{- end }}

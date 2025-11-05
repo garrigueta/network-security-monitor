@@ -1,0 +1,97 @@
+{{- if .Values.aiAgent.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-agent
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ai-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "network-security-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: ai-agent
+  template:
+    metadata:
+      labels:
+        {{- include "network-security-monitor.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: ai-agent
+    spec:
+      containers:
+      - name: ai-agent
+        image: "{{ .Values.global.imageRegistry }}{{ .Values.aiAgent.image.repository }}:{{ .Values.aiAgent.image.tag }}"
+        imagePullPolicy: {{ .Values.aiAgent.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.aiAgent.service.apiPort }}
+          name: api
+        - containerPort: {{ .Values.aiAgent.service.mcpPort }}
+          name: mcp
+        env:
+        - name: MONITORING_HOST
+          value: "prometheus"
+        - name: GRAFANA_PORT
+          value: "3000"
+        - name: LOKI_PORT
+          value: "3100"
+        - name: PROMETHEUS_PORT
+          value: "9090"
+        - name: OLLAMA_HOST
+          value: {{ .Values.aiAgent.config.ollamaHost | quote }}
+        - name: OLLAMA_PORT
+          value: "11434"
+        - name: OLLAMA_MODEL
+          value: {{ .Values.aiAgent.config.ollamaModel | quote }}
+        - name: LOG_LEVEL
+          value: {{ .Values.aiAgent.config.logLevel | quote }}
+        volumeMounts:
+        - name: zeek-logs
+          mountPath: /mnt/zeek-logs
+          readOnly: true
+        - name: honeypot-logs
+          mountPath: /mnt/honeypot-logs
+          readOnly: true
+        resources:
+          {{- toYaml .Values.aiAgent.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.aiAgent.service.apiPort }}
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.aiAgent.service.apiPort }}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: zeek-logs
+        persistentVolumeClaim:
+          claimName: zeek-logs
+      - name: honeypot-logs
+        persistentVolumeClaim:
+          claimName: honeypot-logs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-agent
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ai-agent
+spec:
+  type: {{ .Values.aiAgent.service.type }}
+  ports:
+  - name: api
+    port: {{ .Values.aiAgent.service.apiPort }}
+    targetPort: {{ .Values.aiAgent.service.apiPort }}
+  - name: mcp
+    port: {{ .Values.aiAgent.service.mcpPort }}
+    targetPort: {{ .Values.aiAgent.service.mcpPort }}
+  selector:
+    {{- include "network-security-monitor.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: ai-agent
+{{- end }}

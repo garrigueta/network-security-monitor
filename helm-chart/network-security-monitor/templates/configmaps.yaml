@@ -1,0 +1,194 @@
+{{- if .Values.monitoring.prometheus.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    
+    rule_files:
+      # - "first_rules.yml"
+      # - "second_rules.yml"
+    
+    scrape_configs:
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+      
+      - job_name: 'node-exporter'
+        static_configs:
+          - targets: ['node-exporter:9100']
+      
+      - job_name: 'crypto-exporter'
+        static_configs:
+          - targets: ['crypto-exporter:9101']
+        scrape_interval: 60s
+      
+      {{- if .Values.honeypot.enabled }}
+      - job_name: 'honeypot-node-exporter'
+        static_configs:
+          - targets: ['node-exporter-honeypot:9100']
+      {{- end }}
+{{- end }}
+---
+{{- if .Values.monitoring.loki.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-config
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: loki
+data:
+  loki-config.yml: |
+    auth_enabled: false
+    
+    server:
+      http_listen_port: 3100
+      grpc_listen_port: 9096
+    
+    common:
+      path_prefix: /loki
+      storage:
+        filesystem:
+          chunks_directory: /loki/chunks
+          rules_directory: /loki/rules
+      replication_factor: 1
+      ring:
+        instance_addr: 127.0.0.1
+        kvstore:
+          store: inmemory
+    
+    query_range:
+      results_cache:
+        cache:
+          embedded_cache:
+            enabled: true
+            max_size_mb: 100
+    
+    schema_config:
+      configs:
+        - from: 2020-10-24
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+    
+    ruler:
+      alertmanager_url: http://localhost:9093
+    
+    limits_config:
+      retention_period: 168h
+      allow_structured_metadata: false
+{{- end }}
+---
+{{- if .Values.monitoring.promtail.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-config
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: promtail
+data:
+  promtail-config.yml: |
+    server:
+      http_listen_port: 9080
+      grpc_listen_port: 0
+    
+    positions:
+      filename: /var/lib/promtail/positions.yaml
+    
+    clients:
+      - url: http://loki:3100/loki/api/v1/push
+    
+    scrape_configs:
+    {{- if .Values.zeek.enabled }}
+      - job_name: zeek-logs
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: zeek
+              __path__: /mnt/zeek-logs/*.log
+        pipeline_stages:
+          - regex:
+              expression: '^(?P<timestamp>\S+)\s+(?P<content>.*)'
+          - timestamp:
+              source: timestamp
+              format: Unix
+          - output:
+              source: content
+    {{- end }}
+    
+    {{- if .Values.honeypot.enabled }}
+      - job_name: cowrie-logs
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: cowrie
+              __path__: /mnt/honeypot-logs/cowrie/*.log
+      
+      - job_name: heralding-logs
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: heralding
+              __path__: /mnt/honeypot-logs/heralding/*.csv
+    {{- end }}
+{{- end }}
+---
+{{- if .Values.zeek.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zeek-config
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zeek
+data:
+  local.zeek: |
+    # Local Zeek configuration
+    @load base/frameworks/software
+    @load base/protocols/conn
+    @load base/protocols/dns
+    @load base/protocols/http
+    @load base/protocols/ssl
+    @load base/protocols/ssh
+    @load base/protocols/ftp
+    @load base/protocols/smtp
+    @load policy/frameworks/notice/actions/add-geodata
+    @load policy/protocols/conn/known-hosts
+    @load policy/protocols/conn/known-services
+    @load policy/protocols/ssl/known-certs
+    @load policy/protocols/ssl/validate-certs
+    @load policy/protocols/ssh/geo-data
+    @load policy/protocols/ssh/detect-bruteforcing
+    @load policy/protocols/ssh/software
+    @load policy/protocols/http/software
+    
+    # Security monitoring
+    @load policy/misc/detect-traceroute
+    @load policy/misc/scan
+    
+    # Enable JSON logs
+    @load tuning/json-logs
+    
+    # Log to separate files
+    redef LogAscii::output_to_stdout = T;
+    redef LogAscii::include_meta = T;
+{{- end }}

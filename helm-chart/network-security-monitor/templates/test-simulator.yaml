@@ -1,0 +1,171 @@
+{{- if .Values.testSimulator.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-simulator-config
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: test-simulator
+data:
+  config.yaml: |
+    # Target configuration
+    target:
+      host: "cowrie.{{ include "network-security-monitor.namespace" . }}.svc.cluster.local"
+      ports:
+        ssh: 2222
+        telnet: 2223
+        ftp: 21
+        http: 80
+        https: 443
+        mysql: 3306
+        postgresql: 5432
+    
+    # Test scenarios
+    scenarios:
+      - name: "ssh_bruteforce"
+        protocol: "ssh"
+        enabled: true
+        attempts: 10
+        delay: 2  # seconds between attempts
+      
+      - name: "telnet_bruteforce"
+        protocol: "telnet"
+        enabled: true
+        attempts: 5
+        delay: 3
+      
+      - name: "ftp_scan"
+        protocol: "ftp"
+        enabled: true
+        attempts: 3
+        delay: 1
+      
+      - name: "http_scan"
+        protocol: "http"
+        enabled: true
+        attempts: 5
+        delay: 2
+    
+    # Attack patterns
+    patterns:
+      ssh:
+        usernames: ["root", "admin", "user", "test", "oracle", "postgres"]
+        passwords: ["password", "123456", "admin", "root", "test"]
+      
+      telnet:
+        usernames: ["admin", "root", "user"]
+        passwords: ["admin", "password", "123456"]
+      
+      ftp:
+        usernames: ["anonymous", "ftp", "admin"]
+        passwords: ["", "ftp", "admin"]
+      
+      database:
+        usernames: ["root", "admin", "sa", "postgres"]
+        passwords: ["password", "admin", "123456", "root"]
+    
+    # Reporting
+    reporting:
+      enabled: true
+      format: "json"
+      output_dir: "/app/results"
+    
+    # Simulation options
+    simulation:
+      max_concurrent: 3
+      timeout: 30
+      randomize: true
+      verbose: true
+
+{{- if .Values.testSimulator.job.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: security-test-simulator
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: test-simulator
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "network-security-monitor.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: test-simulator
+    spec:
+      restartPolicy: Never
+      {{- if .Values.testSimulator.job.hostNetwork }}
+      hostNetwork: true
+      {{- end }}
+      containers:
+      - name: test-simulator
+        image: "{{ .Values.global.imageRegistry }}{{ .Values.testSimulator.image.repository }}:{{ .Values.testSimulator.image.tag }}"
+        imagePullPolicy: {{ .Values.testSimulator.image.pullPolicy }}
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        volumeMounts:
+        - name: config
+          mountPath: /app/config.yaml
+          subPath: config.yaml
+        - name: results
+          mountPath: /app/results
+        resources:
+          {{- toYaml .Values.testSimulator.resources | nindent 10 }}
+      volumes:
+      - name: config
+        configMap:
+          name: test-simulator-config
+      - name: results
+        emptyDir: {}
+  backoffLimit: {{ .Values.testSimulator.job.backoffLimit }}
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: security-test-simulator-scheduled
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: test-simulator
+spec:
+  schedule: {{ .Values.testSimulator.job.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "network-security-monitor.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: test-simulator
+        spec:
+          restartPolicy: Never
+          {{- if .Values.testSimulator.job.hostNetwork }}
+          hostNetwork: true
+          {{- end }}
+          containers:
+          - name: test-simulator
+            image: "{{ .Values.global.imageRegistry }}{{ .Values.testSimulator.image.repository }}:{{ .Values.testSimulator.image.tag }}"
+            imagePullPolicy: {{ .Values.testSimulator.image.pullPolicy }}
+            env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+            - name: results
+              mountPath: /app/results
+            resources:
+              {{- toYaml .Values.testSimulator.resources | nindent 14 }}
+          volumes:
+          - name: config
+            configMap:
+              name: test-simulator-config
+          - name: results
+            emptyDir: {}
+      backoffLimit: {{ .Values.testSimulator.job.backoffLimit }}
+{{- end }}
+{{- end }}
