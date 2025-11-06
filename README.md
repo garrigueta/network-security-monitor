@@ -29,6 +29,17 @@ actionable security reports.
 - Incident response and forensic analysis
 - Compliance monitoring and audit trail generation
 
+## 📖 Documentation
+
+**Complete documentation is available at: https://garrigueta.github.io/network-security-monitor-docs/**
+
+The documentation includes:
+- Installation guides and quick start
+- Component architecture overview  
+- Configuration and customization
+- API reference with examples
+- Dashboard guides and troubleshooting
+
 ## How It Works
 
 The platform operates in three integrated layers:
