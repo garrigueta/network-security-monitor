@@ -1,0 +1,205 @@
+{
+  "id": 12,
+  "panels": [
+    {
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*conn.log\"}[10m]))",
+          "legendFormat": "Connections (10m)",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Connections",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+                "color": "green",
+                "value": null
+              },
+              {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+                "color": "yellow",
+                "value": 10
+              },
+              {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+                "color": "red",
+                "value": 100
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*conn.log\"} |~ \"S0|REJ|RSTO\"[10m]))",
+          "legendFormat": "Failed (10m)",
+          "refId": "A"
+        }
+      ],
+      "title": "Failed Connections",
+      "type": "stat"
+    },
+    {
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*conn.log\"} |~ \"tcp\"[10m]))",
+          "legendFormat": "TCP (10m)",
+          "refId": "A"
+        }
+      ],
+      "title": "TCP Connections",
+      "type": "stat"
+    },
+    {
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 4,
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*conn.log\"} |~ \"udp\"[10m]))",
+          "legendFormat": "UDP (10m)",
+          "refId": "A"
+        }
+      ],
+      "title": "UDP Connections",
+      "type": "stat"
+    },
+    {
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "id": 5,
+      "options": {
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "expr": "{job=\"zeek\", filename=~\".*conn.log\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent Connections",
+      "type": "logs"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineInterpolation": "linear",
+            "pointSize": 3
+          },
+          "unit": "cpm"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 6,
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "expr": "sum by() (count_over_time({job=\"zeek\", filename=~\".*conn.log\"}[1m]))",
+          "legendFormat": "Connections/minute",
+          "refId": "A"
+        }
+      ],
+      "title": "Connection Rate Over Time",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "style": "dark",
+  "tags": [
+    "zeek",
+    "connections",
+    "network"
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Zeek Connection Analysis",
+  "uid": "af2glhkczkvlsd",
+  "version": 2
+}

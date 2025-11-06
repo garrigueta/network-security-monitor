@@ -1,5 +1,6 @@
 #!/bin/bash
-set -e
+# Don't exit on error - we need to show diagnostics
+set +e
 
 # Get interface from environment or default to eth0
 INTERFACE=${ZEEK_INTERFACE:-eth0}
@@ -52,6 +53,12 @@ sleep 5
 # Check if zeek is running and logs are being generated
 echo "Zeek status:"
 /usr/local/zeek/bin/zeekctl status
+
+# If zeek failed, show diagnostic
+if ! /usr/local/zeek/bin/zeekctl status | grep -q "running"; then
+    echo "ERROR: Zeek failed to start. Diagnostic output:"
+    /usr/local/zeek/bin/zeekctl diag
+fi
 
 echo "Log directory contents:"
 ls -la /mnt/zeek-logs/logs/

@@ -1,0 +1,276 @@
+{
+  "id": 13,
+  "panels": [
+    {
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*ssl.log\"}[10m]))",
+          "legendFormat": "SSL Connections (10m)",
+          "refId": "A"
+        }
+      ],
+      "title": "Total SSL Connections",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+                "color": "red",
+                "value": null
+              },
+              {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+                "color": "yellow",
+                "value": 1
+              },
+              {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+                "color": "green",
+                "value": 10
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*ssl.log\"} |~ \"TLSv1.3\"[10m]))",
+          "legendFormat": "TLS 1.3 (10m)",
+          "refId": "A"
+        }
+      ],
+      "title": "TLS Version Distribution",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+                "color": "green",
+                "value": null
+              },
+              {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+                "color": "yellow",
+                "value": 1
+              },
+              {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*notice.log\"} |~ \"SSL::Certificate_Expired|SSL::Invalid_Certificate\"[10m]))",
+          "legendFormat": "Cert Issues (10m)",
+          "refId": "A"
+        }
+      ],
+      "title": "Certificate Warnings",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+                "color": "green",
+                "value": null
+              },
+              {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+                "color": "yellow",
+                "value": 1
+              },
+              {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+                "color": "red",
+                "value": 3
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 4,
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "expr": "sum(count_over_time({job=\"zeek\", filename=~\".*ssl.log\"} |~ \"handshake_failure|certificate_verify_failed\"[10m]))",
+          "legendFormat": "SSL Errors (10m)",
+          "refId": "A"
+        }
+      ],
+      "title": "SSL/TLS Errors",
+      "type": "stat"
+    },
+    {
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "id": 5,
+      "options": {
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "expr": "{job=\"zeek\", filename=~\".*ssl.log\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent SSL Connections",
+      "type": "logs"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineInterpolation": "linear",
+            "pointSize": 3
+          },
+          "unit": "cpm"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 6,
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "expr": "sum by() (count_over_time({job=\"zeek\", filename=~\".*ssl.log\"}[1m]))",
+          "legendFormat": "SSL Connections/minute",
+          "refId": "A"
+        }
+      ],
+      "title": "SSL Connection Timeline",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "style": "dark",
+  "tags": [
+    "zeek",
+    "ssl",
+    "tls",
+    "security"
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Zeek SSL/TLS Analysis",
+  "uid": "ef2glhtkf3v9cd",
+  "version": 3
+}

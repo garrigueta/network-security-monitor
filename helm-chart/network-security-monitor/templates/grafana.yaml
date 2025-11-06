@@ -49,12 +49,27 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /var/lib/grafana
+        - name: dashboards-provisioning
+          mountPath: /etc/grafana/provisioning/dashboards
+        - name: datasources-provisioning
+          mountPath: /etc/grafana/provisioning/datasources
+        - name: dashboards
+          mountPath: /var/lib/grafana/dashboards
         resources:
           {{- toYaml .Values.monitoring.grafana.resources | nindent 10 }}
       volumes:
       - name: data
         persistentVolumeClaim:
           claimName: grafana-data
+      - name: dashboards-provisioning
+        configMap:
+          name: grafana-dashboards-provisioning
+      - name: datasources-provisioning
+        configMap:
+          name: grafana-datasources-provisioning
+      - name: dashboards
+        configMap:
+          name: grafana-dashboards
 ---
 apiVersion: v1
 kind: Service

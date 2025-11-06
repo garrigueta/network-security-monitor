@@ -121,15 +121,17 @@ data:
               - localhost
             labels:
               job: zeek
-              __path__: /mnt/zeek-logs/*.log
+              __path__: /mnt/zeek-logs/spool/zeek/*.log
         pipeline_stages:
-          - regex:
-              expression: '^(?P<timestamp>\S+)\s+(?P<content>.*)'
+          - json:
+              expressions:
+                ts: ts
+                uid: uid
+                id_orig_h: '["id.orig_h"]'
+                id_resp_h: '["id.resp_h"]'
           - timestamp:
-              source: timestamp
+              source: ts
               format: Unix
-          - output:
-              source: content
     {{- end }}
     
     {{- if .Values.honeypot.enabled }}
@@ -162,7 +164,7 @@ metadata:
     app.kubernetes.io/component: zeek
 data:
   local.zeek: |
-    # Local Zeek configuration
+    # Local Zeek configuration  
     @load base/frameworks/software
     @load base/protocols/conn
     @load base/protocols/dns
@@ -171,15 +173,13 @@ data:
     @load base/protocols/ssh
     @load base/protocols/ftp
     @load base/protocols/smtp
-    @load policy/frameworks/notice/actions/add-geodata
+    
+    # Security policies
     @load policy/protocols/conn/known-hosts
     @load policy/protocols/conn/known-services
     @load policy/protocols/ssl/known-certs
     @load policy/protocols/ssl/validate-certs
-    @load policy/protocols/ssh/geo-data
     @load policy/protocols/ssh/detect-bruteforcing
-    @load policy/protocols/ssh/software
-    @load policy/protocols/http/software
     
     # Security monitoring
     @load policy/misc/detect-traceroute
@@ -188,7 +188,7 @@ data:
     # Enable JSON logs
     @load tuning/json-logs
     
-    # Log to separate files
-    redef LogAscii::output_to_stdout = T;
+    # Write logs to files (not stdout)
+    redef LogAscii::output_to_stdout = F;
     redef LogAscii::include_meta = T;
 {{- end }}

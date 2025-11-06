@@ -1,0 +1,69 @@
+{{- if .Values.monitoring.grafana.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-provisioning
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 10
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources-provisioning
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        uid: PBFA97CFB590B2093
+        url: http://prometheus:9090
+        isDefault: true
+        editable: true
+      - name: Loki
+        type: loki
+        access: proxy
+        uid: P8E80F9AEF21F6940
+        url: http://loki:3100
+        editable: true
+      - name: AI Agent API
+        type: marcusolsson-json-datasource
+        access: proxy
+        uid: ai-agent-json-ds
+        url: http://ai-agent:8080
+        editable: true
+        jsonData:
+          queryParams: ""
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+data:
+{{- range $path, $_ := .Files.Glob "dashboards/*.json" }}
+  {{ base $path }}: |-
+{{ $.Files.Get $path | indent 4 }}
+{{- end }}
+{{- end }}

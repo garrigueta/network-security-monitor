@@ -145,7 +145,7 @@ zeek:
     limits:
       memory: "4Gi"
       cpu: "2000m"
-  interface: "eth0"
+  interface: "eth1"  # Physical network interface for monitoring
   storage:
     size: "30Gi"
   hostNetwork: true
@@ -156,7 +156,7 @@ honeypot:
   
   # Cowrie SSH/Telnet honeypot
   cowrie:
-    enabled: true
+    enabled: false  # Disabled due to installation issues
     image:
       repository: cowrie/cowrie
       tag: "latest"
@@ -247,7 +247,7 @@ testSimulator:
       cpu: "500m"
   # Run as a job on demand
   job:
-    enabled: true
+    enabled: false  # Disabled temporarily - enable after services are stable
     schedule: "0 2 * * *"  # Daily at 2 AM
     hostNetwork: true
     backoffLimit: 3

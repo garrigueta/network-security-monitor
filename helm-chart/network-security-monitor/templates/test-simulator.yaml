@@ -11,7 +11,7 @@ data:
   config.yaml: |
     # Target configuration
     target:
-      host: "cowrie.{{ include "network-security-monitor.namespace" . }}.svc.cluster.local"
+      host: "heralding.{{ include "network-security-monitor.namespace" . }}.svc.cluster.local"
       ports:
         ssh: 2222
         telnet: 2223
