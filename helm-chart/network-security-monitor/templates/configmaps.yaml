@@ -148,8 +148,19 @@ data:
           - targets:
               - localhost
             labels:
-              job: heralding
-              __path__: /mnt/honeypot-logs/heralding/*.csv
+              job: honeypot
+              honeypot_type: heralding
+              __path__: /mnt/honeypot-logs/heralding/*.json
+        pipeline_stages:
+          - json:
+              expressions:
+                timestamp: timestamp
+                source_ip: source_ip
+                destination_port: destination_port
+                protocol: protocol
+          - labels:
+              source_ip:
+              protocol:
     {{- end }}
 {{- end }}
 ---

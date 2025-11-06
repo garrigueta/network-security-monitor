@@ -107,7 +107,7 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "expr": "rate(node_disk_reads_completed_total{device=\"sda1\"}[5m])",
+          "expr": "rate(node_disk_reads_completed_total{device=\"sda\"}[5m])",
           "refId": "A"
         }
       ],
@@ -200,7 +200,7 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "expr": "rate(node_disk_writes_completed_total{device=\"sda1\"}[5m])",
+          "expr": "rate(node_disk_writes_completed_total{device=\"sda\"}[5m])",
           "refId": "A"
         }
       ],
@@ -294,7 +294,7 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "expr": "rate(node_disk_read_bytes_total{device=\"sda1\"}[5m])",
+          "expr": "rate(node_disk_read_bytes_total{device=\"sda\"}[5m])",
           "refId": "A"
         }
       ],
@@ -388,7 +388,7 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "expr": "100 * rate(node_disk_io_time_seconds_total{device=\"sda1\"}[5m])",
+          "expr": "100 * rate(node_disk_io_time_seconds_total{device=\"sda\"}[5m])",
           "refId": "A"
         }
       ],
@@ -451,7 +451,7 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "expr": "node_disk_io_now{device=\"sda1\"}",
+          "expr": "node_disk_io_now{device=\"sda\"}",
           "refId": "A"
         }
       ],
@@ -544,7 +544,7 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "expr": "rate(node_disk_reads_completed_total{device=\"sda1\"}[5m]) + rate(node_disk_writes_completed_total{device=\"sda1\"}[5m])",
+          "expr": "rate(node_disk_reads_completed_total{device=\"sda\"}[5m]) + rate(node_disk_writes_completed_total{device=\"sda\"}[5m])",
           "refId": "A"
         }
       ],
