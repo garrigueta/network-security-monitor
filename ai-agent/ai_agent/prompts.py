@@ -44,7 +44,7 @@ Analyze security data to identify threats, patterns, and provide actionable insi
 Always be thorough but concise. Focus on actionable intelligence."""
 
     # Honeypot-specific analysis prompts
-    HONEYPOT_ANALYSIS = """Analyze the honeypot security data below and provide comprehensive insights:
+    HONEYPOT_ANALYSIS = """Analyze the comprehensive honeypot and network security data below:
 
 🍯 HONEYPOT DATA:
 {honeypot_data}
@@ -52,20 +52,31 @@ Always be thorough but concise. Focus on actionable intelligence."""
 🔍 THREAT PATTERNS:
 {threat_patterns}
 
-📋 ANALYSIS REQUIREMENTS:
+🌐 NETWORK CORRELATION (Zeek):
+{zeek_correlation}
+
+📋 CROSS-SOURCE ANALYSIS REQUIREMENTS:
 1. **Executive Summary** - Key security findings and risk level
 2. **Attack Vectors** - Primary methods attackers are using
-3. **Threat Actor Analysis** - Geographic distribution, timing patterns
-4. **Critical Findings** - High-priority security concerns
-5. **Tactical Recommendations** - Immediate actions to take
-6. **Strategic Recommendations** - Long-term security improvements
+3. **Network Correlation** - How honeypot attacks correlate with network traffic
+4. **Threat Actor Analysis** - Geographic distribution, timing patterns
+5. **Attack Chain Reconstruction** - Connect honeypot events with network activity
+6. **Critical Findings** - High-priority security concerns with evidence
+7. **Tactical Recommendations** - Immediate actions based on all data
+8. **Strategic Recommendations** - Long-term security improvements
 
 🎯 FOCUS AREAS: {focus_areas}
 ⏱️ TIMEFRAME: {timeframe}
 
+IMPORTANT: Correlate honeypot attacks with network traffic patterns. Look for:
+- IPs appearing in both honeypot logs and Zeek connection logs
+- Attack sequences (reconnaissance → exploitation → post-exploitation)
+- Coordinated attack campaigns across multiple protocols
+- Network behavior before/after honeypot interactions
+
 Prioritize findings by severity and provide specific, actionable guidance."""
 
-    NETWORK_ANALYSIS = """Analyze the network security and system metrics below:
+    NETWORK_ANALYSIS = """Analyze the comprehensive network security and system metrics below:
 
 📊 SYSTEM METRICS:
 {network_metrics}
@@ -73,18 +84,30 @@ Prioritize findings by severity and provide specific, actionable guidance."""
 🚨 SECURITY ALERTS:
 {security_alerts}
 
-📋 ANALYSIS REQUIREMENTS:
-1. **System Health Assessment** - Overall infrastructure status
-2. **Security Posture** - Current threat landscape
-3. **Performance Correlation** - Resource usage impact on security
-4. **Alert Analysis** - Priority ranking and investigation guidance
-5. **Capacity Planning** - Resource and security scaling needs
-6. **Remediation Plan** - Step-by-step improvement actions
+� SYSTEM PERFORMANCE:
+{system_metrics}
+
+�📋 COMPREHENSIVE ANALYSIS REQUIREMENTS:
+1. **System Health Assessment** - Overall infrastructure status with Zeek insights
+2. **Security Posture** - Current threat landscape from all sources
+3. **Performance Correlation** - Resource usage impact on security monitoring
+4. **Alert Analysis** - Priority ranking with Zeek evidence
+5. **Network Behavior Patterns** - DNS, HTTP, SSL/TLS anomalies
+6. **Protocol Analysis** - Suspicious protocol usage (SSH, RDP, SMB, FTP)
+7. **Capacity Planning** - Resource and security scaling needs
+8. **Remediation Plan** - Step-by-step improvement actions with evidence
 
 🎯 FOCUS AREAS: {focus_areas}
 ⏱️ TIMEFRAME: {timeframe}
 
-Correlate security events with system performance and provide operational guidance."""
+IMPORTANT: Use Zeek network logs to:
+- Validate security alerts with actual network traffic
+- Identify unusual DNS queries or HTTP patterns
+- Detect SSL/TLS anomalies
+- Find signs of data exfiltration
+- Correlate security events with network behavior
+
+Provide operational guidance based on complete network visibility."""
 
     NATURAL_LANGUAGE_QUERY = """Based on the security data provided, answer the user's question:
 
@@ -127,23 +150,27 @@ Be direct and specific in your response while providing necessary security conte
 Focus on evidence-based findings and provide confidence ratings."""
 
     @classmethod
-    def get_honeypot_prompt(cls, honeypot_data: str, threat_patterns: str, 
-                           focus_areas: list, timeframe: str) -> str:
-        """Get formatted honeypot analysis prompt"""
+    def get_honeypot_prompt(cls, honeypot_data: str, threat_patterns: str,
+                           focus_areas: list, timeframe: str,
+                           zeek_correlation: str = "") -> str:
+        """Get formatted honeypot analysis prompt with network correlation"""
         return cls.HONEYPOT_ANALYSIS.format(
             honeypot_data=honeypot_data,
             threat_patterns=threat_patterns,
+            zeek_correlation=zeek_correlation or "No Zeek correlation data available",
             focus_areas=", ".join(focus_areas) if focus_areas else "general security analysis",
             timeframe=timeframe
         )
     
     @classmethod
     def get_network_prompt(cls, network_metrics: str, security_alerts: str,
-                          focus_areas: list, timeframe: str) -> str:
-        """Get formatted network analysis prompt"""
+                          focus_areas: list, timeframe: str,
+                          system_metrics: str = "") -> str:
+        """Get formatted network analysis prompt with system metrics"""
         return cls.NETWORK_ANALYSIS.format(
             network_metrics=network_metrics,
             security_alerts=security_alerts,
+            system_metrics=system_metrics or "No system metrics available",
             focus_areas=", ".join(focus_areas) if focus_areas else "general network security",
             timeframe=timeframe
         )

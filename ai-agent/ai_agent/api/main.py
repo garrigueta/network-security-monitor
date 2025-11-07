@@ -231,6 +231,107 @@ async def get_openapi_yaml():
         raise HTTPException(status_code=404, detail="OpenAPI specification not found")
 
 
+# Data Collection Endpoints
+
+@app.get("/logs/all")
+async def get_all_logs(
+    hours: int = 24,
+    include_files: bool = False,
+    _: bool = Depends(verify_api_key)
+):
+    """
+    Get all logs from all applications/sources
+    
+    Parameters:
+    - hours: Time window in hours (default: 24)
+    - include_files: Include raw file paths in response (default: False)
+    
+    Returns comprehensive log data from:
+    - Honeypot applications (Cowrie, Heralding)
+    - Zeek network monitoring
+    - Loki log aggregation
+    """
+    try:
+        data_collector = app.state.data_sources
+        
+        all_logs = await data_collector.get_all_logs(
+            hours=hours,
+            include_raw_files=include_files
+        )
+        
+        return {
+            "success": True,
+            "data": all_logs,
+            "metadata": {
+                "collection_time": all_logs["collection_timestamp"],
+                "time_window_hours": hours,
+                "total_entries": all_logs["summary"]["total_entries"],
+                "sources": list(all_logs["summary"]["by_source"].keys())
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error collecting all logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/logs/honeypot")
+async def get_honeypot_logs(
+    hours: int = 24,
+    limit: int = 1000,
+    _: bool = Depends(verify_api_key)
+):
+    """Get honeypot logs (Cowrie and Heralding)"""
+    try:
+        data_collector = app.state.data_sources
+        logs = await data_collector.get_honeypot_logs(hours=hours, limit=limit)
+        
+        return {
+            "success": True,
+            "count": len(logs),
+            "logs": logs
+        }
+    except Exception as e:
+        logger.error(f"Error getting honeypot logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/logs/zeek")
+async def get_zeek_logs(
+    log_type: Optional[str] = None,
+    hours: int = 24,
+    _: bool = Depends(verify_api_key)
+):
+    """
+    Get Zeek network monitoring logs
+    
+    Parameters:
+    - log_type: Specific log type (conn, dns, http, ssl, etc.) or None for all
+    - hours: Time window in hours
+    """
+    try:
+        data_collector = app.state.data_sources
+        
+        if log_type:
+            logs = await data_collector.get_local_zeek_logs(
+                log_types=[log_type],
+                hours=hours
+            )
+        else:
+            logs = await data_collector.get_local_zeek_logs(hours=hours)
+        
+        total_entries = sum(len(entries) for entries in logs.values())
+        
+        return {
+            "success": True,
+            "log_types": list(logs.keys()),
+            "total_entries": total_entries,
+            "logs": logs
+        }
+    except Exception as e:
+        logger.error(f"Error getting Zeek logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Report Management Endpoints
 
 @app.post("/reports/generate", response_model=dict)

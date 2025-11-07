@@ -66,37 +66,48 @@ class AIEngine:
             logger.warning(f"Remote Ollama connection failed: {e} - AI features may be limited")
     
     async def analyze_honeypot(self, timeframe: str = "24h", focus_areas: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Analyze honeypot activity using AI"""
+        """Analyze honeypot activity using AI with comprehensive log data"""
         try:
-            # Collect honeypot data using MCP
-            tools_result = await mcp_server.call_tool(
-                "get_honeypot_activity",
-                {"hours": self._timeframe_to_hours(timeframe), "limit": 200}
-            )
+            # Get comprehensive logs from all sources
+            hours = self._timeframe_to_hours(timeframe)
+            all_logs = await self.data_collector.get_all_logs(hours=hours, include_raw_files=False)
             
-            honeypot_data = tools_result[0]["text"] if tools_result else "No honeypot data available"
+            # Extract honeypot-specific data
+            cowrie_count = len(all_logs["sources"]["honeypot"].get("cowrie", []))
+            heralding_count = len(all_logs["sources"]["honeypot"].get("heralding", []))
+            
+            # Also get Zeek data for correlation
+            zeek_summary = {
+                "conn": len(all_logs["sources"]["zeek"].get("conn", [])),
+                "dns": len(all_logs["sources"]["zeek"].get("dns", [])),
+                "http": len(all_logs["sources"]["zeek"].get("http", []))
+            }
             
             # Get threat patterns
-            patterns_result = await mcp_server.call_tool(
-                "analyze_threat_patterns",
-                {"timeframe": timeframe, "focus": "all"}
+            threat_patterns = await self.data_collector.analyze_threats(
+                timeframe=timeframe, focus="all"
             )
             
-            threat_patterns = patterns_result[0]["text"] if patterns_result else "No threat patterns found"
+            # Create comprehensive analysis prompt
+            honeypot_summary = {
+                "cowrie_events": cowrie_count,
+                "heralding_events": heralding_count,
+                "total_honeypot_events": cowrie_count + heralding_count,
+                "unique_ips": len(set(
+                    log.get("src_ip", "") for log in all_logs["sources"]["honeypot"].get("cowrie", [])
+                    if log.get("src_ip")
+                ))
+            }
             
-            # Truncate large data sets to avoid overwhelming the model
-            honeypot_data = self._truncate_data(honeypot_data, max_length=4000)
-            threat_patterns = self._truncate_data(threat_patterns, max_length=2000)
-            
-            # Create analysis prompt using template
             prompt = prompt_templates.get_honeypot_prompt(
-                honeypot_data=honeypot_data,
-                threat_patterns=threat_patterns,
+                honeypot_data=json.dumps(honeypot_summary, indent=2),
+                threat_patterns=self._truncate_data(json.dumps(threat_patterns, indent=2), 2000),
                 focus_areas=focus_areas or ["general security analysis"],
-                timeframe=timeframe
+                timeframe=timeframe,
+                zeek_correlation=json.dumps(zeek_summary, indent=2)
             )
             
-            # Get AI analysis with appropriate parameters
+            # Get AI analysis
             ai_response = await self._query_ollama(prompt, analysis_type="honeypot")
             
             return {
@@ -104,8 +115,13 @@ class AIEngine:
                 "timeframe": timeframe,
                 "ai_analysis": ai_response,
                 "raw_data": {
-                    "honeypot_activity": honeypot_data,
+                    "honeypot_summary": honeypot_summary,
+                    "zeek_summary": zeek_summary,
                     "threat_patterns": threat_patterns
+                },
+                "comprehensive_logs": {
+                    "total_entries": all_logs["summary"]["total_entries"],
+                    "sources": list(all_logs["summary"]["by_source"].keys())
                 },
                 "focus_areas": focus_areas or ["general"]
             }
@@ -119,40 +135,47 @@ class AIEngine:
             }
     
     async def analyze_network(self, timeframe: str = "24h", focus_areas: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Analyze network security and system metrics"""
+        """Analyze network security and system metrics with comprehensive Zeek data"""
         try:
-            # Get network metrics
-            metrics_tasks = []
-            for metric in ["cpu_usage", "memory_usage", "network_connections"]:
-                task = mcp_server.call_tool("get_network_metrics", {"metric": metric, "duration": "1h"})
-                metrics_tasks.append(task)
+            # Get comprehensive logs
+            hours = self._timeframe_to_hours(timeframe)
+            all_logs = await self.data_collector.get_all_logs(hours=hours, include_raw_files=False)
             
-            metrics_results = await asyncio.gather(*metrics_tasks, return_exceptions=True)
+            # Extract Zeek network analysis
+            zeek_logs = all_logs["sources"].get("zeek", {})
+            network_summary = {
+                "total_connections": len(zeek_logs.get("conn", [])),
+                "dns_queries": len(zeek_logs.get("dns", [])),
+                "http_requests": len(zeek_logs.get("http", [])),
+                "ssl_connections": len(zeek_logs.get("ssl", [])),
+                "ssh_attempts": len(zeek_logs.get("ssh", [])),
+                "file_transfers": len(zeek_logs.get("files", [])),
+                "weird_events": len(zeek_logs.get("weird", [])),
+                "security_notices": len(zeek_logs.get("notice", []))
+            }
+            
+            # Get Prometheus metrics for correlation
+            metrics_data = {}
+            for metric in ["cpu_usage", "memory_usage", "network_connections"]:
+                try:
+                    result = await self.data_collector.get_prometheus_metrics(metric, "1h")
+                    metrics_data[metric] = result
+                except Exception as e:
+                    logger.warning(f"Could not fetch {metric}: {e}")
             
             # Get security alerts
-            alerts_result = await mcp_server.call_tool(
-                "get_security_alerts",
-                {"severity": "all", "source": "all"}
-            )
+            alerts = await self.data_collector.get_security_alerts(severity="all", source="all")
             
-            # Compile data for analysis
-            network_data = ""
-            for i, result in enumerate(metrics_results):
-                if not isinstance(result, Exception) and result:
-                    metric_name = ["cpu_usage", "memory_usage", "network_connections"][i]
-                    network_data += f"\n{metric_name.upper()}:\n{result[0]['text']}\n"
-            
-            alerts_data = alerts_result[0]["text"] if alerts_result else "No alerts found"
-            
-            # Create analysis prompt using template
+            # Create comprehensive analysis prompt
             prompt = prompt_templates.get_network_prompt(
-                network_metrics=network_data,
-                security_alerts=alerts_data,
+                network_metrics=json.dumps(network_summary, indent=2),
+                security_alerts=json.dumps(alerts[:20], indent=2) if alerts else "No alerts",
                 focus_areas=focus_areas or ["general network security"],
-                timeframe=timeframe
+                timeframe=timeframe,
+                system_metrics=json.dumps(metrics_data, indent=2)
             )
             
-            # Get AI analysis with appropriate parameters
+            # Get AI analysis
             ai_response = await self._query_ollama(prompt, analysis_type="network")
             
             return {
@@ -160,8 +183,13 @@ class AIEngine:
                 "timeframe": timeframe,
                 "ai_analysis": ai_response,
                 "raw_data": {
-                    "network_metrics": network_data,
-                    "security_alerts": alerts_data
+                    "zeek_summary": network_summary,
+                    "system_metrics": metrics_data,
+                    "security_alerts": alerts[:20] if alerts else []
+                },
+                "comprehensive_logs": {
+                    "total_entries": all_logs["summary"]["total_entries"],
+                    "zeek_log_types": list(zeek_logs.keys())
                 },
                 "focus_areas": focus_areas or ["general"]
             }
