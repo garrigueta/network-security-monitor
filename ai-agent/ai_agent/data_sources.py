@@ -665,6 +665,7 @@ class DataCollector:
                 # Bytes transferred
                 orig_bytes = log.get("orig_bytes", 0) or 0
                 resp_bytes = log.get("resp_bytes", 0) or 0
+                total_bytes = 0
                 if isinstance(orig_bytes, (int, float)) and isinstance(resp_bytes, (int, float)):
                     total_bytes = orig_bytes + resp_bytes
                     bytes_total.append(total_bytes)
@@ -683,7 +684,7 @@ class DataCollector:
                     })
                 
                 # High data transfer
-                if bytes_total and total_bytes > LARGE_DATA_TRANSFER_BYTES:  # > 100MB
+                if total_bytes > LARGE_DATA_TRANSFER_BYTES:  # > 100MB
                     analysis["suspicious_patterns"].append({
                         "type": "high_data_transfer",
                         "description": f"Large data transfer ({total_bytes/1000000:.1f}MB) from {src_ip} to {dst_ip}",
