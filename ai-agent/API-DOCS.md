@@ -90,8 +90,56 @@ curl -X POST "http://localhost:8080/query" \
 curl -H "X-API-Key: your-api-key" http://localhost:8080/mcp/tools
 ```
 
+### 6. Threat Hunting
+
+```bash
+curl -X POST "http://localhost:8080/threat-hunt" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "hunt_focus": "lateral_movement",
+    "time_range": "24h",
+    "ioc_list": ["192.168.1.100", "malicious-domain.com"]
+  }'
+```
+
+### 7. Event Correlation
+
+```bash
+curl -X POST "http://localhost:8080/correlate" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "time_range": "24h",
+    "correlation_type": "cross_source"
+  }'
+```
+
+### 8. Batch Analysis
+
+```bash
+curl -X POST "http://localhost:8080/batch-analyze" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "queries": [
+      {"type": "honeypot", "timeframe": "24h"},
+      {"type": "network", "timeframe": "6h"},
+      {"type": "threat_hunt", "hunt_focus": "data_exfiltration", "time_range": "24h"}
+    ]
+  }'
+```
+
+### 9. Data Sources Summary
+
+```bash
+curl "http://localhost:8080/data-sources/summary?hours=24" \
+  -H "X-API-Key: your-api-key"
+```
+
 ## Endpoints
 
+### Basic Analysis
 | Endpoint | Method | Description | Auth Required |
 |----------|---------|-------------|---------------|
 | `/health` | GET | Service health check | No |
@@ -99,6 +147,18 @@ curl -H "X-API-Key: your-api-key" http://localhost:8080/mcp/tools
 | `/analyze/network` | POST | Analyze network security | Yes |
 | `/query` | POST | Natural language queries | Yes |
 | `/mcp/tools` | GET | List MCP tools | Yes |
+
+### Advanced Analysis
+| Endpoint | Method | Description | Auth Required |
+|----------|---------|-------------|---------------|
+| `/threat-hunt` | POST | Advanced threat hunting with IOC tracking | Yes |
+| `/correlate` | POST | Cross-source event correlation | Yes |
+| `/batch-analyze` | POST | Batch processing of multiple queries | Yes |
+| `/data-sources/summary` | GET | Summary statistics from all sources | Yes |
+
+### Documentation
+| Endpoint | Method | Description | Auth Required |
+|----------|---------|-------------|---------------|
 | `/docs` | GET | Swagger UI documentation | No |
 | `/redoc` | GET | ReDoc documentation | No |
 | `/openapi.json` | GET | OpenAPI specification (JSON) | No |
@@ -132,6 +192,114 @@ curl -H "X-API-Key: your-api-key" http://localhost:8080/mcp/tools
   "timestamp": "2025-11-01T23:03:08.906369",
   "sources": ["honeypot_logs", "network_metrics"],
   "confidence": 0.85
+}
+```
+
+### Threat Hunt Response
+
+```json
+{
+  "success": true,
+  "hunt_focus": "lateral_movement",
+  "time_range": "24h",
+  "ai_analysis": "Comprehensive threat hunting analysis...",
+  "ioc_matches": {
+    "192.168.1.100": 5,
+    "malicious-domain.com": 12
+  },
+  "timestamp": "2025-11-01T23:03:08.906369",
+  "metadata": {
+    "data_sources": ["honeypot", "threat_patterns", "security_alerts"],
+    "ioc_provided": true
+  }
+}
+```
+
+### Correlation Response
+
+```json
+{
+  "success": true,
+  "time_range": "24h",
+  "correlation_type": "cross_source",
+  "correlations_found": {
+    "ip_correlations": {
+      "192.168.1.50": {
+        "count": 45,
+        "event_types": ["ssh.login", "telnet.session"]
+      }
+    },
+    "temporal_correlations": [
+      {
+        "type": "burst_activity",
+        "event_count": 150,
+        "description": "Detected burst of 150 events in 24h"
+      }
+    ],
+    "pattern_matches": []
+  },
+  "ai_analysis": "Correlation analysis results...",
+  "timestamp": "2025-11-01T23:03:08.906369",
+  "metadata": {
+    "sources_analyzed": ["honeypot", "alerts", "metrics"],
+    "total_events": 250
+  }
+}
+```
+
+### Batch Analysis Response
+
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "query_index": 0,
+      "result": { ... },
+      "success": true
+    },
+    {
+      "query_index": 1,
+      "result": { ... },
+      "success": true
+    }
+  ],
+  "total_queries": 3,
+  "successful": 3,
+  "failed": 0,
+  "timestamp": "2025-11-01T23:03:08.906369"
+}
+```
+
+### Data Sources Summary Response
+
+```json
+{
+  "success": true,
+  "summary": {
+    "timestamp": "2025-11-01T23:03:08.906369",
+    "timeframe_hours": 24,
+    "honeypot": {
+      "total_events": 1250,
+      "unique_ips": 87
+    },
+    "alerts": {
+      "total": 15
+    },
+    "zeek": {
+      "log_types": ["conn", "dns", "http", "ssl"],
+      "total_entries": 5420
+    },
+    "data_sources_available": [
+      "honeypot_logs",
+      "security_alerts",
+      "threat_analysis",
+      "zeek_logs",
+      "metric_cpu_usage",
+      "metric_memory_usage"
+    ]
+  },
+  "timestamp": "2025-11-01T23:03:08.906369"
 }
 ```
 
@@ -178,10 +346,62 @@ class SecurityAIClient:
         response = requests.post(f"{self.base_url}/query", 
                                json=data, headers=self.headers)
         return response.json()
+    
+    def threat_hunt(self, hunt_focus, time_range="24h", ioc_list=None):
+        data = {
+            "hunt_focus": hunt_focus,
+            "time_range": time_range,
+            "ioc_list": ioc_list
+        }
+        response = requests.post(f"{self.base_url}/threat-hunt",
+                               json=data, headers=self.headers)
+        return response.json()
+    
+    def correlate_events(self, time_range="24h", correlation_type="cross_source"):
+        data = {
+            "time_range": time_range,
+            "correlation_type": correlation_type
+        }
+        response = requests.post(f"{self.base_url}/correlate",
+                               json=data, headers=self.headers)
+        return response.json()
+    
+    def batch_analyze(self, queries):
+        data = {"queries": queries}
+        response = requests.post(f"{self.base_url}/batch-analyze",
+                               json=data, headers=self.headers)
+        return response.json()
+    
+    def get_data_summary(self, hours=24):
+        response = requests.get(f"{self.base_url}/data-sources/summary?hours={hours}",
+                              headers=self.headers)
+        return response.json()
 
 # Usage
 client = SecurityAIClient(api_key="your-api-key")
+
+# Basic analysis
 result = client.analyze_honeypot(period="1h")
+
+# Threat hunting
+hunt_result = client.threat_hunt(
+    hunt_focus="lateral_movement",
+    time_range="24h",
+    ioc_list=["192.168.1.100", "malicious.com"]
+)
+
+# Event correlation
+correlation = client.correlate_events(time_range="24h")
+
+# Batch processing
+batch_result = client.batch_analyze([
+    {"type": "honeypot", "timeframe": "24h"},
+    {"type": "network", "timeframe": "6h"},
+    {"type": "threat_hunt", "hunt_focus": "data_exfiltration"}
+])
+
+# Data summary
+summary = client.get_data_summary(hours=24)
 ```
 
 ### JavaScript/Node.js
