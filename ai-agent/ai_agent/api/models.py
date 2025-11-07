@@ -60,3 +60,53 @@ class ThreatPattern(BaseModel):
     severity: str
     description: str
     recommendations: List[str]
+
+
+class ThreatHuntRequest(BaseModel):
+    """Request for threat hunting analysis"""
+    hunt_focus: str = Field(description="Focus area for threat hunting (e.g., 'lateral_movement', 'data_exfiltration')")
+    time_range: str = Field(default="24h", description="Time range for hunting (1h, 6h, 24h, 7d)")
+    ioc_list: Optional[List[str]] = Field(default=None, description="List of IOCs to search for")
+
+
+class ThreatHuntResponse(BaseModel):
+    """Response from threat hunting"""
+    success: bool
+    hunt_focus: str
+    time_range: str
+    ai_analysis: str
+    ioc_matches: Optional[Dict[str, int]] = None
+    timestamp: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class CorrelationRequest(BaseModel):
+    """Request for event correlation analysis"""
+    time_range: str = Field(default="24h", description="Time range for correlation")
+    correlation_type: str = Field(default="cross_source", description="Type of correlation analysis")
+
+
+class CorrelationResponse(BaseModel):
+    """Response from correlation analysis"""
+    success: bool
+    time_range: str
+    correlation_type: str
+    correlations_found: Dict[str, Any]
+    ai_analysis: str
+    timestamp: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class BatchAnalysisRequest(BaseModel):
+    """Request for batch analysis"""
+    queries: List[Dict[str, Any]] = Field(description="List of analysis queries to process")
+
+
+class BatchAnalysisResponse(BaseModel):
+    """Response from batch analysis"""
+    success: bool
+    results: List[Dict[str, Any]]
+    total_queries: int
+    successful: int
+    failed: int
+    timestamp: Optional[str] = None

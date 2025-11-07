@@ -26,7 +26,13 @@ from .models import (
     AnalysisRequest,
     AnalysisResponse,
     QueryRequest,
-    QueryResponse
+    QueryResponse,
+    ThreatHuntRequest,
+    ThreatHuntResponse,
+    CorrelationRequest,
+    CorrelationResponse,
+    BatchAnalysisRequest,
+    BatchAnalysisResponse
 )
 
 logger = structlog.get_logger()
@@ -214,6 +220,26 @@ async def list_mcp_tools(_: bool = Depends(verify_api_key)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/data-sources/summary")
+async def get_data_summary(
+    hours: int = 24,
+    _: bool = Depends(verify_api_key)
+):
+    """Get summary statistics from all data sources"""
+    try:
+        data_sources = app.state.data_sources
+        summary = await data_sources.get_summary_statistics(hours=hours)
+        
+        return {
+            "success": True,
+            "summary": summary,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error getting data summary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/openapi.yaml", include_in_schema=False)
 async def get_openapi_yaml():
     """Serve the OpenAPI specification in YAML format"""
@@ -229,6 +255,96 @@ async def get_openapi_yaml():
         )
     else:
         raise HTTPException(status_code=404, detail="OpenAPI specification not found")
+
+
+# Advanced Analysis Endpoints
+
+@app.post("/threat-hunt", response_model=ThreatHuntResponse)
+async def threat_hunting(
+    request: ThreatHuntRequest,
+    _: bool = Depends(verify_api_key)
+):
+    """Perform advanced threat hunting with IOC tracking and attack chain reconstruction"""
+    try:
+        ai_engine = app.state.ai_engine
+        
+        result = await ai_engine.threat_hunt(
+            hunt_focus=request.hunt_focus,
+            time_range=request.time_range,
+            ioc_list=request.ioc_list
+        )
+        
+        return ThreatHuntResponse(
+            success=True,
+            hunt_focus=result.get("hunt_focus", request.hunt_focus),
+            time_range=result.get("time_range", request.time_range),
+            ai_analysis=result.get("ai_analysis", ""),
+            ioc_matches=result.get("ioc_matches"),
+            timestamp=result.get("timestamp"),
+            metadata=result.get("metadata")
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in threat hunting: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/correlate", response_model=CorrelationResponse)
+async def correlate_events(
+    request: CorrelationRequest,
+    _: bool = Depends(verify_api_key)
+):
+    """Correlate security events across multiple data sources"""
+    try:
+        ai_engine = app.state.ai_engine
+        
+        result = await ai_engine.correlate_events(
+            time_range=request.time_range,
+            correlation_type=request.correlation_type
+        )
+        
+        return CorrelationResponse(
+            success=True,
+            time_range=result.get("time_range", request.time_range),
+            correlation_type=result.get("correlation_type", request.correlation_type),
+            correlations_found=result.get("correlations_found", {}),
+            ai_analysis=result.get("ai_analysis", ""),
+            timestamp=result.get("timestamp"),
+            metadata=result.get("metadata")
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in event correlation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/batch-analyze", response_model=BatchAnalysisResponse)
+async def batch_analysis(
+    request: BatchAnalysisRequest,
+    _: bool = Depends(verify_api_key)
+):
+    """Process multiple analysis requests in batch for efficiency"""
+    try:
+        ai_engine = app.state.ai_engine
+        
+        results = await ai_engine.batch_analyze(request.queries)
+        
+        # Count successes and failures
+        successful = sum(1 for r in results if r.get("success", False))
+        failed = len(results) - successful
+        
+        return BatchAnalysisResponse(
+            success=True,
+            results=results,
+            total_queries=len(request.queries),
+            successful=successful,
+            failed=failed,
+            timestamp=datetime.now().isoformat()
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in batch analysis: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Report Management Endpoints

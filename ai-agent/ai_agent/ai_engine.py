@@ -27,6 +27,9 @@ class AIEngine:
         )
         # Use centralized system prompt
         self.system_prompt = prompt_templates.SYSTEM_PROMPT
+        # Response cache for performance
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache_ttl = 300  # 5 minutes cache TTL
     
     def _truncate_data(self, data: str, max_length: int = 5000) -> str:
         """Intelligently truncate data while preserving structure"""
@@ -391,6 +394,366 @@ class AIEngine:
                 return f"AI analysis failed: {type(e).__name__}: {str(e)}"
         
         return "AI analysis failed after multiple retries"
+    
+    def _get_cache_key(self, operation: str, params: Dict[str, Any]) -> str:
+        """Generate cache key from operation and parameters"""
+        import hashlib
+        params_str = json.dumps(params, sort_keys=True)
+        return hashlib.md5(f"{operation}:{params_str}".encode()).hexdigest()
+    
+    def _get_cached_response(self, cache_key: str) -> Optional[Dict[str, Any]]:
+        """Get cached response if available and not expired"""
+        if cache_key in self._cache:
+            cached = self._cache[cache_key]
+            age = (datetime.now() - cached["timestamp"]).total_seconds()
+            if age < self._cache_ttl:
+                logger.info(f"Cache hit for {cache_key} (age: {age:.1f}s)")
+                return cached["data"]
+            else:
+                # Remove expired entry
+                del self._cache[cache_key]
+        return None
+    
+    def _set_cache(self, cache_key: str, data: Dict[str, Any]):
+        """Store response in cache"""
+        self._cache[cache_key] = {
+            "timestamp": datetime.now(),
+            "data": data
+        }
+        logger.debug(f"Cached response for {cache_key}")
+    
+    async def threat_hunt(self, hunt_focus: str, time_range: str = "24h", 
+                         ioc_list: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Advanced threat hunting with IOC tracking and attack chain reconstruction"""
+        try:
+            # Check cache first
+            cache_key = self._get_cache_key("threat_hunt", {
+                "hunt_focus": hunt_focus,
+                "time_range": time_range,
+                "ioc_count": len(ioc_list) if ioc_list else 0
+            })
+            cached = self._get_cached_response(cache_key)
+            if cached:
+                return cached
+            
+            # Gather comprehensive data from multiple sources
+            data_tasks = []
+            
+            # Get honeypot data
+            hours = self._timeframe_to_hours(time_range)
+            data_tasks.append(
+                mcp_server.call_tool("get_honeypot_activity", {"hours": hours, "limit": 500})
+            )
+            
+            # Get threat patterns
+            data_tasks.append(
+                mcp_server.call_tool("analyze_threat_patterns", {"timeframe": time_range, "focus": hunt_focus})
+            )
+            
+            # Get security alerts
+            data_tasks.append(
+                mcp_server.call_tool("get_security_alerts", {"severity": "all", "source": "all"})
+            )
+            
+            # Fetch all data in parallel
+            results = await asyncio.gather(*data_tasks, return_exceptions=True)
+            
+            # Process results
+            honeypot_data = results[0][0]["text"] if results[0] and not isinstance(results[0], Exception) else "No data"
+            threat_patterns = results[1][0]["text"] if results[1] and not isinstance(results[1], Exception) else "No patterns"
+            security_alerts = results[2][0]["text"] if results[2] and not isinstance(results[2], Exception) else "No alerts"
+            
+            # IOC correlation if provided
+            ioc_matches = []
+            if ioc_list:
+                ioc_matches = await self._correlate_iocs(ioc_list, honeypot_data)
+            
+            # Build comprehensive hunting context
+            hunt_context = f"""
+THREAT HUNTING FOCUS: {hunt_focus}
+TIME RANGE: {time_range}
+
+HONEYPOT ACTIVITY:
+{self._truncate_data(honeypot_data, 3000)}
+
+THREAT PATTERNS:
+{self._truncate_data(threat_patterns, 2000)}
+
+SECURITY ALERTS:
+{self._truncate_data(security_alerts, 2000)}
+"""
+            
+            if ioc_matches:
+                hunt_context += f"\n\nIOC MATCHES FOUND:\n"
+                for ioc, matches in ioc_matches.items():
+                    hunt_context += f"- {ioc}: {matches} occurrences\n"
+            
+            # Create threat hunting prompt
+            prompt = prompt_templates.get_threat_hunting_prompt(
+                hunt_focus=hunt_focus,
+                data_sources=["honeypot", "threat_patterns", "security_alerts"],
+                time_range=time_range
+            )
+            prompt += f"\n\n{hunt_context}"
+            
+            # Get AI analysis
+            ai_response = await self._query_ollama(prompt, analysis_type="threat_hunting")
+            
+            result = {
+                "timestamp": datetime.now().isoformat(),
+                "hunt_focus": hunt_focus,
+                "time_range": time_range,
+                "ai_analysis": ai_response,
+                "ioc_matches": ioc_matches,
+                "raw_data": {
+                    "honeypot_activity": honeypot_data,
+                    "threat_patterns": threat_patterns,
+                    "security_alerts": security_alerts
+                },
+                "metadata": {
+                    "data_sources": ["honeypot", "threat_patterns", "security_alerts"],
+                    "ioc_provided": bool(ioc_list)
+                }
+            }
+            
+            # Cache the result
+            self._set_cache(cache_key, result)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in threat hunting: {e}")
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "error": str(e),
+                "ai_analysis": "Threat hunting unavailable due to error"
+            }
+    
+    async def _correlate_iocs(self, ioc_list: List[str], data: str) -> Dict[str, int]:
+        """Correlate IOCs against collected data"""
+        matches = {}
+        data_lower = data.lower()
+        
+        for ioc in ioc_list:
+            ioc_lower = ioc.lower()
+            count = data_lower.count(ioc_lower)
+            if count > 0:
+                matches[ioc] = count
+        
+        return matches
+    
+    async def correlate_events(self, time_range: str = "24h", 
+                              correlation_type: str = "cross_source") -> Dict[str, Any]:
+        """Correlate security events across multiple data sources"""
+        try:
+            # Check cache
+            cache_key = self._get_cache_key("correlate_events", {
+                "time_range": time_range,
+                "correlation_type": correlation_type
+            })
+            cached = self._get_cached_response(cache_key)
+            if cached:
+                return cached
+            
+            hours = self._timeframe_to_hours(time_range)
+            
+            # Gather data from multiple sources in parallel
+            tasks = []
+            tasks.append(self.data_collector.get_honeypot_logs(hours=hours, limit=200))
+            tasks.append(mcp_server.call_tool("get_security_alerts", {"severity": "all", "source": "all"}))
+            tasks.append(mcp_server.call_tool("get_network_metrics", {"metric": "network_connections", "duration": "1h"}))
+            
+            honeypot_logs, alerts_result, metrics_result = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Extract data
+            alerts = []
+            if not isinstance(alerts_result, Exception) and alerts_result:
+                alerts_text = alerts_result[0]["text"]
+            else:
+                alerts_text = "No alerts"
+            
+            metrics = ""
+            if not isinstance(metrics_result, Exception) and metrics_result:
+                metrics = metrics_result[0]["text"]
+            
+            # Perform correlation analysis
+            correlations = await self._analyze_correlations(honeypot_logs, alerts_text, metrics)
+            
+            # Build prompt for AI analysis
+            correlation_context = f"""
+CORRELATION TYPE: {correlation_type}
+TIME RANGE: {time_range}
+
+IDENTIFIED CORRELATIONS:
+{json.dumps(correlations, indent=2)}
+
+HONEYPOT DATA SUMMARY:
+Total Events: {len(honeypot_logs) if not isinstance(honeypot_logs, Exception) else 0}
+
+SECURITY ALERTS:
+{self._truncate_data(alerts_text, 1500)}
+
+NETWORK METRICS:
+{self._truncate_data(metrics, 1000)}
+"""
+            
+            prompt = f"""Analyze the following correlated security events and provide insights:
+
+{correlation_context}
+
+Provide:
+1. Key correlations and their significance
+2. Potential attack patterns identified
+3. Risk assessment
+4. Recommended actions
+"""
+            
+            # Get AI analysis
+            ai_response = await self._query_ollama(prompt, analysis_type="query")
+            
+            result = {
+                "timestamp": datetime.now().isoformat(),
+                "time_range": time_range,
+                "correlation_type": correlation_type,
+                "correlations_found": correlations,
+                "ai_analysis": ai_response,
+                "metadata": {
+                    "sources_analyzed": ["honeypot", "alerts", "metrics"],
+                    "total_events": len(honeypot_logs) if not isinstance(honeypot_logs, Exception) else 0
+                }
+            }
+            
+            # Cache result
+            self._set_cache(cache_key, result)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in event correlation: {e}")
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "error": str(e),
+                "ai_analysis": "Event correlation unavailable due to error"
+            }
+    
+    async def _analyze_correlations(self, honeypot_logs: List[Dict], 
+                                   alerts: str, metrics: str) -> Dict[str, Any]:
+        """Analyze correlations between different data sources"""
+        correlations = {
+            "ip_correlations": {},
+            "temporal_correlations": [],
+            "pattern_matches": []
+        }
+        
+        if isinstance(honeypot_logs, Exception):
+            return correlations
+        
+        # IP-based correlation
+        ip_activity = {}
+        for log in honeypot_logs:
+            ip = log.get("src_ip", "")
+            if ip:
+                if ip not in ip_activity:
+                    ip_activity[ip] = {"count": 0, "event_types": set(), "timestamps": []}
+                ip_activity[ip]["count"] += 1
+                ip_activity[ip]["event_types"].add(log.get("eventid", "unknown"))
+                if "timestamp" in log:
+                    ip_activity[ip]["timestamps"].append(log["timestamp"])
+        
+        # Identify high-activity IPs
+        high_activity_ips = {
+            ip: {"count": data["count"], "event_types": list(data["event_types"])}
+            for ip, data in ip_activity.items()
+            if data["count"] > 10
+        }
+        correlations["ip_correlations"] = high_activity_ips
+        
+        # Temporal correlation - burst detection
+        if honeypot_logs:
+            timestamps = [log.get("timestamp", "") for log in honeypot_logs if "timestamp" in log]
+            if timestamps:
+                # Simple burst detection
+                if len(timestamps) > 50:
+                    correlations["temporal_correlations"].append({
+                        "type": "burst_activity",
+                        "event_count": len(timestamps),
+                        "description": f"Detected burst of {len(timestamps)} events in {time_range}"
+                    })
+        
+        return correlations
+    
+    async def batch_analyze(self, queries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process multiple analysis requests in batch for efficiency"""
+        try:
+            logger.info(f"Starting batch analysis of {len(queries)} queries")
+            
+            # Process queries in parallel with controlled concurrency
+            max_concurrent = 3  # Limit concurrent AI calls
+            results = []
+            
+            for i in range(0, len(queries), max_concurrent):
+                batch = queries[i:i + max_concurrent]
+                batch_tasks = []
+                
+                for query in batch:
+                    query_type = query.get("type", "query")
+                    
+                    if query_type == "honeypot":
+                        task = self.analyze_honeypot(
+                            timeframe=query.get("timeframe", "24h"),
+                            focus_areas=query.get("focus_areas")
+                        )
+                    elif query_type == "network":
+                        task = self.analyze_network(
+                            timeframe=query.get("timeframe", "24h"),
+                            focus_areas=query.get("focus_areas")
+                        )
+                    elif query_type == "threat_hunt":
+                        task = self.threat_hunt(
+                            hunt_focus=query.get("hunt_focus", "general"),
+                            time_range=query.get("time_range", "24h"),
+                            ioc_list=query.get("ioc_list")
+                        )
+                    elif query_type == "correlate":
+                        task = self.correlate_events(
+                            time_range=query.get("time_range", "24h"),
+                            correlation_type=query.get("correlation_type", "cross_source")
+                        )
+                    else:  # Default to query
+                        task = self.process_query(
+                            query=query.get("query", ""),
+                            context=query.get("context")
+                        )
+                    
+                    batch_tasks.append(task)
+                
+                # Execute batch
+                batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+                
+                # Process results
+                for idx, result in enumerate(batch_results):
+                    if isinstance(result, Exception):
+                        results.append({
+                            "query_index": i + idx,
+                            "error": str(result),
+                            "success": False
+                        })
+                    else:
+                        results.append({
+                            "query_index": i + idx,
+                            "result": result,
+                            "success": True
+                        })
+            
+            logger.info(f"Batch analysis completed: {len(results)} results")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error in batch analysis: {e}")
+            return [{
+                "error": str(e),
+                "success": False
+            }]
     
     async def close(self):
         """Close HTTP client and cleanup"""

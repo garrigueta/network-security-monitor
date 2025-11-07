@@ -16,7 +16,12 @@ class DataCollector:
     """Collects data from various monitoring infrastructure components"""
     
     def __init__(self):
-        self.http_client = httpx.AsyncClient(timeout=30.0)
+        self.http_client = httpx.AsyncClient(
+            timeout=30.0,
+            limits=httpx.Limits(max_keepalive_connections=10, max_connections=20)
+        )
+        self._retry_attempts = 3
+        self._retry_delay = 2
     
     async def get_honeypot_logs(self, hours: int = 24, limit: int = 100) -> List[Dict[str, Any]]:
         """Get honeypot logs from Loki or local filesystem"""
@@ -476,6 +481,102 @@ class DataCollector:
             
         except Exception as e:
             logger.error(f"Error reading local Zeek logs: {e}")
+            return {}
+    
+    async def _fetch_with_retry(self, url: str, params: Dict[str, Any] = None, 
+                                method: str = "GET") -> Optional[httpx.Response]:
+        """Fetch data with retry logic and exponential backoff"""
+        for attempt in range(self._retry_attempts):
+            try:
+                if method == "GET":
+                    response = await self.http_client.get(url, params=params)
+                else:
+                    response = await self.http_client.post(url, json=params)
+                
+                if response.status_code == 200:
+                    return response
+                else:
+                    logger.warning(f"HTTP {response.status_code} from {url} (attempt {attempt + 1}/{self._retry_attempts})")
+                    
+            except Exception as e:
+                logger.warning(f"Request failed: {e} (attempt {attempt + 1}/{self._retry_attempts})")
+            
+            if attempt < self._retry_attempts - 1:
+                await asyncio.sleep(self._retry_delay * (2 ** attempt))
+        
+        logger.error(f"Failed to fetch from {url} after {self._retry_attempts} attempts")
+        return None
+    
+    async def get_all_data_sources(self, hours: int = 24) -> Dict[str, Any]:
+        """Fetch data from all sources in parallel for comprehensive analysis"""
+        logger.info(f"Fetching data from all sources (last {hours}h)")
+        
+        # Create tasks for parallel execution
+        tasks = {
+            "honeypot_logs": self.get_honeypot_logs(hours=hours, limit=500),
+            "security_alerts": self.get_security_alerts(severity="all", source="all"),
+            "threat_analysis": self.analyze_threats(timeframe=f"{hours}h", focus="all"),
+            "zeek_logs": self.get_local_zeek_logs(hours=hours),
+        }
+        
+        # Add metrics tasks
+        metric_tasks = {}
+        for metric in ["cpu_usage", "memory_usage", "network_connections"]:
+            metric_tasks[f"metric_{metric}"] = self.get_prometheus_metrics(metric, "1h")
+        
+        # Combine all tasks
+        all_tasks = {**tasks, **metric_tasks}
+        
+        # Execute all in parallel
+        results = {}
+        gathered = await asyncio.gather(*all_tasks.values(), return_exceptions=True)
+        
+        # Map results back to keys
+        for i, key in enumerate(all_tasks.keys()):
+            if isinstance(gathered[i], Exception):
+                logger.warning(f"Failed to fetch {key}: {gathered[i]}")
+                results[key] = None
+            else:
+                results[key] = gathered[i]
+        
+        logger.info(f"Data collection complete: {sum(1 for v in results.values() if v is not None)}/{len(results)} sources successful")
+        return results
+    
+    async def get_summary_statistics(self, hours: int = 24) -> Dict[str, Any]:
+        """Get summary statistics from all data sources"""
+        try:
+            data = await self.get_all_data_sources(hours=hours)
+            
+            stats = {
+                "timestamp": datetime.now().isoformat(),
+                "timeframe_hours": hours,
+                "honeypot": {
+                    "total_events": len(data.get("honeypot_logs") or []),
+                    "unique_ips": len(set(
+                        log.get("src_ip", "") 
+                        for log in (data.get("honeypot_logs") or [])
+                        if log.get("src_ip")
+                    ))
+                },
+                "alerts": {
+                    "total": len(data.get("security_alerts") or [])
+                },
+                "zeek": {
+                    "log_types": list((data.get("zeek_logs") or {}).keys()),
+                    "total_entries": sum(
+                        len(logs) for logs in (data.get("zeek_logs") or {}).values()
+                    )
+                },
+                "data_sources_available": [
+                    key for key, value in data.items() 
+                    if value is not None
+                ]
+            }
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Error getting summary statistics: {e}")
             return {}
     
     async def close(self):
