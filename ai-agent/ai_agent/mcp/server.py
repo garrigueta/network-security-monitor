@@ -48,6 +48,39 @@ class NetworkSecurityMCPServer:
                     "timeframe": {"type": "string", "default": "24h"},
                     "focus": {"type": "string", "default": "all"}
                 }
+            },
+            "analyze_zeek_connections": {
+                "description": "Analyze Zeek connection logs for network traffic patterns and anomalies",
+                "parameters": {
+                    "hours": {"type": "integer", "default": 24},
+                    "min_bytes": {"type": "integer", "default": 0}
+                }
+            },
+            "analyze_zeek_dns": {
+                "description": "Analyze Zeek DNS logs for DNS query patterns and suspicious domains",
+                "parameters": {
+                    "hours": {"type": "integer", "default": 24}
+                }
+            },
+            "analyze_zeek_http": {
+                "description": "Analyze Zeek HTTP logs for web traffic patterns and potential attacks",
+                "parameters": {
+                    "hours": {"type": "integer", "default": 24}
+                }
+            },
+            "analyze_zeek_files": {
+                "description": "Analyze Zeek file logs for file transfers and types",
+                "parameters": {
+                    "hours": {"type": "integer", "default": 24}
+                }
+            },
+            "get_zeek_logs": {
+                "description": "Get raw Zeek logs of specific type from local filesystem",
+                "parameters": {
+                    "log_types": {"type": "array", "default": ["conn", "dns", "http"]},
+                    "hours": {"type": "integer", "default": 24},
+                    "limit": {"type": "integer", "default": 100}
+                }
             }
         }
     
@@ -62,6 +95,16 @@ class NetworkSecurityMCPServer:
             return await self._get_security_alerts(arguments)
         elif name == "analyze_threat_patterns":
             return await self._analyze_threat_patterns(arguments)
+        elif name == "analyze_zeek_connections":
+            return await self._analyze_zeek_connections(arguments)
+        elif name == "analyze_zeek_dns":
+            return await self._analyze_zeek_dns(arguments)
+        elif name == "analyze_zeek_http":
+            return await self._analyze_zeek_http(arguments)
+        elif name == "analyze_zeek_files":
+            return await self._analyze_zeek_files(arguments)
+        elif name == "get_zeek_logs":
+            return await self._get_zeek_logs(arguments)
         else:
             return [{"type": "text", "text": f"Unknown tool: {name}"}]
     
@@ -189,6 +232,226 @@ class NetworkSecurityMCPServer:
             
         except Exception as e:
             return [{"type": "text", "text": f"Error analyzing threat patterns: {str(e)}"}]
+    
+    async def _analyze_zeek_connections(self, args: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Analyze Zeek connection logs"""
+        hours = args.get("hours", 24)
+        min_bytes = args.get("min_bytes", 0)
+        
+        try:
+            analysis = await self.data_collector.analyze_zeek_connections(hours=hours, min_bytes=min_bytes)
+            
+            if not analysis or analysis.get("total_connections", 0) == 0:
+                return [{"type": "text", "text": "No Zeek connection data available."}]
+            
+            result_text = f"🔌 **Zeek Connection Analysis** (Last {hours}h):\n\n"
+            
+            result_text += f"📊 **Summary:**\n"
+            result_text += f"• Total Connections: {analysis['total_connections']}\n"
+            result_text += f"• Total Bytes Transferred: {analysis['bytes_transferred']['total'] / 1000000:.2f} MB\n"
+            result_text += f"• Average Connection Duration: {analysis['duration_stats']['avg']:.2f}s\n\n"
+            
+            if analysis.get("protocols"):
+                result_text += "🌐 **Protocols:**\n"
+                for proto, count in list(analysis["protocols"].items())[:10]:
+                    result_text += f"• {proto}: {count} connections\n"
+                result_text += "\n"
+            
+            if analysis.get("services"):
+                result_text += "🔧 **Services:**\n"
+                for service, count in list(analysis["services"].items())[:10]:
+                    if service != "unknown":
+                        result_text += f"• {service}: {count} connections\n"
+                result_text += "\n"
+            
+            if analysis.get("top_sources"):
+                result_text += "📍 **Top Source IPs:**\n"
+                for ip, count in list(analysis["top_sources"].items())[:5]:
+                    result_text += f"• {ip}: {count} connections\n"
+                result_text += "\n"
+            
+            if analysis.get("suspicious_patterns"):
+                result_text += "⚠️ **Suspicious Patterns:**\n"
+                for pattern in analysis["suspicious_patterns"][:10]:
+                    result_text += f"• [{pattern['severity'].upper()}] {pattern['type']}: {pattern['description']}\n"
+            
+            return [{"type": "text", "text": result_text}]
+            
+        except Exception as e:
+            return [{"type": "text", "text": f"Error analyzing Zeek connections: {str(e)}"}]
+    
+    async def _analyze_zeek_dns(self, args: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Analyze Zeek DNS logs"""
+        hours = args.get("hours", 24)
+        
+        try:
+            analysis = await self.data_collector.analyze_zeek_dns(hours=hours)
+            
+            if not analysis or analysis.get("total_queries", 0) == 0:
+                return [{"type": "text", "text": "No Zeek DNS data available."}]
+            
+            result_text = f"🔍 **Zeek DNS Analysis** (Last {hours}h):\n\n"
+            
+            result_text += f"📊 **Summary:**\n"
+            result_text += f"• Total Queries: {analysis['total_queries']}\n\n"
+            
+            if analysis.get("query_types"):
+                result_text += "📝 **Query Types:**\n"
+                for qtype, count in list(analysis["query_types"].items())[:10]:
+                    result_text += f"• {qtype}: {count}\n"
+                result_text += "\n"
+            
+            if analysis.get("response_codes"):
+                result_text += "📋 **Response Codes:**\n"
+                for rcode, count in list(analysis["response_codes"].items())[:10]:
+                    result_text += f"• {rcode}: {count}\n"
+                result_text += "\n"
+            
+            if analysis.get("top_domains"):
+                result_text += "🌐 **Top Queried Domains:**\n"
+                for domain, count in list(analysis["top_domains"].items())[:10]:
+                    result_text += f"• {domain}: {count} queries\n"
+                result_text += "\n"
+            
+            if analysis.get("suspicious_domains"):
+                result_text += "⚠️ **Suspicious Domains:**\n"
+                for domain_info in analysis["suspicious_domains"][:10]:
+                    result_text += f"• {domain_info['domain']} - {domain_info['reason']}\n"
+            
+            return [{"type": "text", "text": result_text}]
+            
+        except Exception as e:
+            return [{"type": "text", "text": f"Error analyzing Zeek DNS: {str(e)}"}]
+    
+    async def _analyze_zeek_http(self, args: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Analyze Zeek HTTP logs"""
+        hours = args.get("hours", 24)
+        
+        try:
+            analysis = await self.data_collector.analyze_zeek_http(hours=hours)
+            
+            if not analysis or analysis.get("total_requests", 0) == 0:
+                return [{"type": "text", "text": "No Zeek HTTP data available."}]
+            
+            result_text = f"🌐 **Zeek HTTP Analysis** (Last {hours}h):\n\n"
+            
+            result_text += f"📊 **Summary:**\n"
+            result_text += f"• Total Requests: {analysis['total_requests']}\n\n"
+            
+            if analysis.get("methods"):
+                result_text += "📝 **HTTP Methods:**\n"
+                for method, count in list(analysis["methods"].items()):
+                    result_text += f"• {method}: {count}\n"
+                result_text += "\n"
+            
+            if analysis.get("status_codes"):
+                result_text += "📋 **Status Codes:**\n"
+                for code, count in list(analysis["status_codes"].items())[:10]:
+                    result_text += f"• {code}: {count}\n"
+                result_text += "\n"
+            
+            if analysis.get("top_hosts"):
+                result_text += "🏠 **Top Hosts:**\n"
+                for host, count in list(analysis["top_hosts"].items())[:10]:
+                    result_text += f"• {host}: {count} requests\n"
+                result_text += "\n"
+            
+            if analysis.get("user_agents"):
+                result_text += "🖥️ **Top User Agents:**\n"
+                for ua, count in list(analysis["user_agents"].items())[:5]:
+                    result_text += f"• {ua}: {count}\n"
+                result_text += "\n"
+            
+            if analysis.get("suspicious_requests"):
+                result_text += "⚠️ **Suspicious Requests:**\n"
+                for req in analysis["suspicious_requests"][:10]:
+                    result_text += f"• [{req['type']}] {req['method']} {req['host']}{req['uri']}\n"
+            
+            return [{"type": "text", "text": result_text}]
+            
+        except Exception as e:
+            return [{"type": "text", "text": f"Error analyzing Zeek HTTP: {str(e)}"}]
+    
+    async def _analyze_zeek_files(self, args: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Analyze Zeek file logs"""
+        hours = args.get("hours", 24)
+        
+        try:
+            analysis = await self.data_collector.analyze_zeek_files(hours=hours)
+            
+            if not analysis or analysis.get("total_files", 0) == 0:
+                return [{"type": "text", "text": "No Zeek file data available."}]
+            
+            result_text = f"📁 **Zeek File Analysis** (Last {hours}h):\n\n"
+            
+            result_text += f"📊 **Summary:**\n"
+            result_text += f"• Total Files: {analysis['total_files']}\n"
+            result_text += f"• Total Size: {analysis['file_sizes']['total'] / 1000000:.2f} MB\n"
+            result_text += f"• Average Size: {analysis['file_sizes']['avg'] / 1000:.2f} KB\n\n"
+            
+            if analysis.get("mime_types"):
+                result_text += "📝 **MIME Types:**\n"
+                for mime, count in list(analysis["mime_types"].items())[:10]:
+                    result_text += f"• {mime}: {count}\n"
+                result_text += "\n"
+            
+            if analysis.get("sources"):
+                result_text += "🔧 **Sources:**\n"
+                for source, count in list(analysis["sources"].items()):
+                    result_text += f"• {source}: {count}\n"
+                result_text += "\n"
+            
+            if analysis.get("large_files"):
+                result_text += "📦 **Large Files (>10MB):**\n"
+                for file_info in analysis["large_files"][:10]:
+                    result_text += f"• {file_info['mime_type']}: {file_info['size_mb']:.2f} MB via {file_info['source']}\n"
+                result_text += "\n"
+            
+            if analysis.get("executable_files"):
+                result_text += "⚠️ **Executable Files:**\n"
+                for exe_info in analysis["executable_files"][:10]:
+                    result_text += f"• {exe_info['mime_type']} via {exe_info['source']}\n"
+            
+            return [{"type": "text", "text": result_text}]
+            
+        except Exception as e:
+            return [{"type": "text", "text": f"Error analyzing Zeek files: {str(e)}"}]
+    
+    async def _get_zeek_logs(self, args: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Get raw Zeek logs"""
+        log_types = args.get("log_types", ["conn", "dns", "http"])
+        hours = args.get("hours", 24)
+        limit = args.get("limit", 100)
+        
+        try:
+            zeek_logs = await self.data_collector.get_local_zeek_logs(
+                log_types=log_types,
+                hours=hours,
+                limit=limit
+            )
+            
+            if not zeek_logs:
+                return [{"type": "text", "text": "No Zeek logs available."}]
+            
+            result_text = f"📊 **Zeek Logs** (Last {hours}h, Limit: {limit}):\n\n"
+            
+            for log_type, logs in zeek_logs.items():
+                result_text += f"\n**{log_type.upper()} logs:** {len(logs)} entries\n"
+                
+                # Show first few entries as examples
+                for i, log in enumerate(logs[:3]):
+                    result_text += f"\nEntry {i+1}:\n"
+                    # Show key fields only
+                    important_fields = ['ts', 'id.orig_h', 'id.resp_h', 'id.resp_p', 
+                                       'proto', 'service', 'query', 'host', 'uri', 'method']
+                    for field in important_fields:
+                        if field in log and log[field] is not None:
+                            result_text += f"  {field}: {log[field]}\n"
+            
+            return [{"type": "text", "text": result_text}]
+            
+        except Exception as e:
+            return [{"type": "text", "text": f"Error getting Zeek logs: {str(e)}"}]
 
 
 # Global MCP server instance
