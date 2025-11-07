@@ -143,7 +143,12 @@ def test_mcp_tools_registration():
     """Test that new MCP tools are properly registered"""
     # Import the actual MCP server
     import sys
-    sys.path.insert(0, '/home/runner/work/network-security-monitor/network-security-monitor/ai-agent')
+    from pathlib import Path
+    
+    # Add parent directory to path relative to this test file
+    test_dir = Path(__file__).parent
+    ai_agent_dir = test_dir.parent
+    sys.path.insert(0, str(ai_agent_dir))
     
     from ai_agent.mcp.server import NetworkSecurityMCPServer
     

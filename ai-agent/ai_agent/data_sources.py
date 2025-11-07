@@ -11,6 +11,11 @@ from .config import settings
 
 logger = structlog.get_logger()
 
+# Constants for threat detection thresholds
+SUSPICIOUS_DURATION_THRESHOLD_SECONDS = 3600  # 1 hour
+LARGE_DATA_TRANSFER_BYTES = 100000000  # 100 MB
+LARGE_FILE_THRESHOLD_BYTES = 10000000  # 10 MB
+
 
 class DataCollector:
     """Collects data from various monitoring infrastructure components"""
@@ -670,7 +675,7 @@ class DataCollector:
                 
                 # Detect suspicious patterns
                 # Long duration connections (> 1 hour)
-                if duration and duration > 3600:
+                if duration and duration > SUSPICIOUS_DURATION_THRESHOLD_SECONDS:
                     analysis["suspicious_patterns"].append({
                         "type": "long_duration",
                         "description": f"Connection from {src_ip} to {dst_ip} lasted {duration:.1f}s",
@@ -678,7 +683,7 @@ class DataCollector:
                     })
                 
                 # High data transfer
-                if bytes_total and total_bytes > 100000000:  # > 100MB
+                if bytes_total and total_bytes > LARGE_DATA_TRANSFER_BYTES:  # > 100MB
                     analysis["suspicious_patterns"].append({
                         "type": "high_data_transfer",
                         "description": f"Large data transfer ({total_bytes/1000000:.1f}MB) from {src_ip} to {dst_ip}",
@@ -904,7 +909,7 @@ class DataCollector:
                     file_sizes.append(total_bytes)
                     
                     # Track large files (> 10MB)
-                    if total_bytes > 10000000:
+                    if total_bytes > LARGE_FILE_THRESHOLD_BYTES:
                         analysis["large_files"].append({
                             "mime_type": mime_type,
                             "size_mb": total_bytes / 1000000,
