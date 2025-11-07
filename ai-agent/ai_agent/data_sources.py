@@ -483,7 +483,7 @@ class DataCollector:
             logger.error(f"Error reading local Zeek logs: {e}")
             return {}
     
-    async def _fetch_with_retry(self, url: str, params: Dict[str, Any] = None, 
+    async def _fetch_with_retry(self, url: str, params: Optional[Dict[str, Any]] = None, 
                                 method: str = "GET") -> Optional[httpx.Response]:
         """Fetch data with retry logic and exponential backoff"""
         for attempt in range(self._retry_attempts):
@@ -532,14 +532,16 @@ class DataCollector:
         gathered = await asyncio.gather(*all_tasks.values(), return_exceptions=True)
         
         # Map results back to keys
+        successful_count = 0
         for i, key in enumerate(all_tasks.keys()):
             if isinstance(gathered[i], Exception):
                 logger.warning(f"Failed to fetch {key}: {gathered[i]}")
                 results[key] = None
             else:
                 results[key] = gathered[i]
+                successful_count += 1
         
-        logger.info(f"Data collection complete: {sum(1 for v in results.values() if v is not None)}/{len(results)} sources successful")
+        logger.info(f"Data collection complete: {successful_count}/{len(results)} sources successful")
         return results
     
     async def get_summary_statistics(self, hours: int = 24) -> Dict[str, Any]:

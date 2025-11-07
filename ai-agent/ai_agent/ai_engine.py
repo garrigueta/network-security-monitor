@@ -18,7 +18,7 @@ logger = structlog.get_logger()
 class AIEngine:
     """AI Engine using Ollama for natural language processing and analysis"""
     
-    def __init__(self):
+    def __init__(self, batch_concurrency: int = 3):
         self.data_collector = DataCollector()
         # Increased timeout and connection settings for remote Ollama
         self.http_client = httpx.AsyncClient(
@@ -30,6 +30,8 @@ class AIEngine:
         # Response cache for performance
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._cache_ttl = 300  # 5 minutes cache TTL
+        # Batch processing concurrency limit
+        self._batch_concurrency = batch_concurrency
     
     def _truncate_data(self, data: str, max_length: int = 5000) -> str:
         """Intelligently truncate data while preserving structure"""
@@ -424,7 +426,26 @@ class AIEngine:
     
     async def threat_hunt(self, hunt_focus: str, time_range: str = "24h", 
                          ioc_list: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Advanced threat hunting with IOC tracking and attack chain reconstruction"""
+        """Advanced threat hunting with IOC tracking and attack chain reconstruction
+        
+        Args:
+            hunt_focus: Focus area for hunting (e.g., 'lateral_movement', 'data_exfiltration', 'persistence')
+            time_range: Time range for analysis (1h, 6h, 24h, 7d), defaults to 24h
+            ioc_list: Optional list of Indicators of Compromise (IPs, domains, hashes) to search for
+            
+        Returns:
+            Dict containing:
+                - timestamp: Analysis timestamp
+                - hunt_focus: The hunting focus area
+                - time_range: Time range analyzed
+                - ai_analysis: AI-generated threat hunting analysis
+                - ioc_matches: Dictionary of IOC matches and their occurrence counts
+                - raw_data: Raw data from honeypot, threat patterns, and security alerts
+                - metadata: Additional analysis metadata
+                
+        Raises:
+            Exception: Returns error dict if hunting fails, does not raise
+        """
         try:
             # Check cache first
             cache_key = self._get_cache_key("threat_hunt", {
@@ -577,7 +598,7 @@ SECURITY ALERTS:
                 metrics = metrics_result[0]["text"]
             
             # Perform correlation analysis
-            correlations = await self._analyze_correlations(honeypot_logs, alerts_text, metrics)
+            correlations = await self._analyze_correlations(honeypot_logs, alerts_text, metrics, time_range)
             
             # Build prompt for AI analysis
             correlation_context = f"""
@@ -637,7 +658,7 @@ Provide:
             }
     
     async def _analyze_correlations(self, honeypot_logs: List[Dict], 
-                                   alerts: str, metrics: str) -> Dict[str, Any]:
+                                   alerts: str, metrics: str, time_range: str = "unknown") -> Dict[str, Any]:
         """Analyze correlations between different data sources"""
         correlations = {
             "ip_correlations": {},
@@ -688,11 +709,10 @@ Provide:
             logger.info(f"Starting batch analysis of {len(queries)} queries")
             
             # Process queries in parallel with controlled concurrency
-            max_concurrent = 3  # Limit concurrent AI calls
             results = []
             
-            for i in range(0, len(queries), max_concurrent):
-                batch = queries[i:i + max_concurrent]
+            for i in range(0, len(queries), self._batch_concurrency):
+                batch = queries[i:i + self._batch_concurrency]
                 batch_tasks = []
                 
                 for query in batch:
