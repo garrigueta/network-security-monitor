@@ -79,8 +79,19 @@ class ReportScheduler:
             period_hours = 1
             
         elif frequency == ReportFrequency.DAILY:
-            trigger = IntervalTrigger(hours=5)  # Every 5 hours
-            period_hours = 24
+            # Stagger daily reports to avoid simultaneous execution
+            if level == ReportLevel.EXECUTIVE:
+                # Executive reports at 8 AM and 8 PM
+                trigger = CronTrigger(hour='8,20', minute=0)
+                period_hours = 24
+            elif level == ReportLevel.TECHNICAL:
+                # Technical reports at 2 AM and 2 PM  
+                trigger = CronTrigger(hour='2,14', minute=0)
+                period_hours = 24
+            else:
+                # Default: every 5 hours for other levels
+                trigger = IntervalTrigger(hours=5)
+                period_hours = 24
             
         elif frequency == ReportFrequency.WEEKLY:
             trigger = CronTrigger(day_of_week='mon', hour=8, minute=0)  # Weekly on Monday
