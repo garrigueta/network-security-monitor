@@ -45,13 +45,27 @@ spec:
           value: {{ .Values.aiAgent.config.ollamaModel | quote }}
         - name: LOG_LEVEL
           value: {{ .Values.aiAgent.config.logLevel | quote }}
+        - name: LOG_FORMAT
+          value: {{ .Values.aiAgent.config.logFormat | quote }}
+        - name: LOG_TO_FILE
+          value: "true"
+        - name: LOG_FILE
+          value: "/mnt/ssd-logs/ai-agent/logs/actions.log"
+        - name: LOG_ROTATION_SIZE
+          value: {{ .Values.aiAgent.config.logRotationSize | quote }}
+        - name: LOG_RETENTION_COUNT
+          value: {{ .Values.aiAgent.config.logRetentionCount | quote }}
+        - name: REPORTS_DIR
+          value: "/mnt/ssd-logs/ai-agent/reports"
         volumeMounts:
         - name: zeek-logs
-          mountPath: /mnt/zeek-logs
+          mountPath: /mnt/ssd-logs/zeek
           readOnly: true
         - name: honeypot-logs
-          mountPath: /mnt/honeypot-logs
+          mountPath: /mnt/ssd-logs/honeypot
           readOnly: true
+        - name: ai-agent-data
+          mountPath: /mnt/ssd-logs/ai-agent
         resources:
           {{- toYaml .Values.aiAgent.resources | nindent 10 }}
         livenessProbe:
@@ -73,6 +87,9 @@ spec:
       - name: honeypot-logs
         persistentVolumeClaim:
           claimName: honeypot-logs
+      - name: ai-agent-data
+        persistentVolumeClaim:
+          claimName: ai-agent-logs
 ---
 apiVersion: v1
 kind: Service

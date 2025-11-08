@@ -2,11 +2,12 @@
 
 import asyncio
 import json
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-from fastapi import FastAPI, HTTPException, Depends, Security
+from fastapi import FastAPI, HTTPException, Depends, Security, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -19,7 +20,8 @@ from ..data_sources import DataCollector
 from ..reports.generator import ReportGenerator
 from ..reports.scheduler import ReportScheduler
 from ..reports.models import (
-    ReportLevel, ReportRequest, ReportListResponse, ReportConfiguration, ReportMetadata
+    ReportLevel, ReportRequest, ReportListResponse, ReportConfiguration, ReportMetadata,
+    ReportFrequency
 )
 from .models import (
     HealthResponse,
@@ -28,6 +30,7 @@ from .models import (
     QueryRequest,
     QueryResponse
 )
+from ..logging_utils import ActionLogger
 
 logger = structlog.get_logger()
 security = HTTPBearer(auto_error=False)
@@ -37,7 +40,13 @@ security = HTTPBearer(auto_error=False)
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
     # Startup
-    logger.info("Starting AI Agent API...")
+    ActionLogger.log_service_action(
+        logger,
+        action="api_startup",
+        status="started",
+        host=settings.api_host,
+        port=settings.api_port
+    )
     
     # Initialize AI engine
     app.state.ai_engine = AIEngine()
@@ -52,24 +61,55 @@ async def lifespan(app: FastAPI):
         data_sources=app.state.data_sources
     )
     
-    # Initialize and start report scheduler
+    # Initialize and start report scheduler with Kubernetes health reports
+    scheduler_config = ReportConfiguration()
+    # Enable daily Kubernetes cluster health reports at 9 AM
+    scheduler_config.frequencies[ReportLevel.EXECUTIVE] = ReportFrequency.DAILY
+    
     app.state.report_scheduler = ReportScheduler(
         report_generator=app.state.report_generator,
-        config=ReportConfiguration()
+        config=scheduler_config
     )
     await app.state.report_scheduler.start()
     
-    logger.info("AI Agent API started successfully")
+    # Schedule daily Kubernetes cluster health report (9 AM)
+    app.state.report_scheduler.scheduler.add_job(
+        app.state.report_scheduler._generate_kubernetes_health_report,
+        trigger='cron',
+        hour=9,
+        minute=0,
+        id='kubernetes_health_daily',
+        name='Daily Kubernetes Cluster Health Report',
+        misfire_grace_time=3600
+    )
+    
+    ActionLogger.log_service_action(
+        logger,
+        action="api_startup",
+        status="completed",
+        host=settings.api_host,
+        port=settings.api_port
+    )
     
     yield
     
     # Shutdown
-    logger.info("Shutting down AI Agent API...")
+    ActionLogger.log_service_action(
+        logger,
+        action="api_shutdown",
+        status="started"
+    )
+    
     if hasattr(app.state, 'report_scheduler'):
         await app.state.report_scheduler.stop()
     if hasattr(app.state, 'ai_engine'):
         await app.state.ai_engine.close()
-    logger.info("AI Agent API shut down")
+    
+    ActionLogger.log_service_action(
+        logger,
+        action="api_shutdown",
+        status="completed"
+    )
 
 
 # Create FastAPI app
@@ -118,15 +158,40 @@ async def health_check():
 @app.post("/analyze/honeypot", response_model=AnalysisResponse)
 async def analyze_honeypot(
     request: AnalysisRequest,
+    http_request: Request,
     _: bool = Depends(verify_api_key)
 ):
     """Analyze honeypot activity and threats"""
+    start_time = time.time()
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    
+    ActionLogger.log_api_request(
+        logger,
+        endpoint="/analyze/honeypot",
+        method="POST",
+        client_ip=client_ip,
+        timeframe=request.timeframe,
+        focus_areas=request.focus_areas
+    )
+    
     try:
         ai_engine = app.state.ai_engine
         
         analysis = await ai_engine.analyze_honeypot(
             timeframe=request.timeframe,
             focus_areas=request.focus_areas
+        )
+        
+        duration_ms = (time.time() - start_time) * 1000
+        
+        ActionLogger.log_api_request(
+            logger,
+            endpoint="/analyze/honeypot",
+            method="POST",
+            status_code=200,
+            duration_ms=duration_ms,
+            client_ip=client_ip,
+            timeframe=request.timeframe
         )
         
         return AnalysisResponse(
@@ -137,22 +202,57 @@ async def analyze_honeypot(
         )
         
     except Exception as e:
-        logger.error(f"Error analyzing honeypot: {e}")
+        duration_ms = (time.time() - start_time) * 1000
+        
+        ActionLogger.log_api_request(
+            logger,
+            endpoint="/analyze/honeypot",
+            method="POST",
+            status_code=500,
+            duration_ms=duration_ms,
+            client_ip=client_ip,
+            error=str(e)
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/analyze/network", response_model=AnalysisResponse)
 async def analyze_network(
     request: AnalysisRequest,
+    http_request: Request,
     _: bool = Depends(verify_api_key)
 ):
     """Analyze network security and system metrics"""
+    start_time = time.time()
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    
+    ActionLogger.log_api_request(
+        logger,
+        endpoint="/analyze/network",
+        method="POST",
+        client_ip=client_ip,
+        timeframe=request.timeframe,
+        focus_areas=request.focus_areas
+    )
+    
     try:
         ai_engine = app.state.ai_engine
         
         analysis = await ai_engine.analyze_network(
             timeframe=request.timeframe,
             focus_areas=request.focus_areas
+        )
+        
+        duration_ms = (time.time() - start_time) * 1000
+        
+        ActionLogger.log_api_request(
+            logger,
+            endpoint="/analyze/network",
+            method="POST",
+            status_code=200,
+            duration_ms=duration_ms,
+            client_ip=client_ip,
+            timeframe=request.timeframe
         )
         
         return AnalysisResponse(
@@ -163,22 +263,138 @@ async def analyze_network(
         )
         
     except Exception as e:
-        logger.error(f"Error analyzing network: {e}")
+        duration_ms = (time.time() - start_time) * 1000
+        
+        ActionLogger.log_api_request(
+            logger,
+            endpoint="/analyze/network",
+            method="POST",
+            status_code=500,
+            duration_ms=duration_ms,
+            client_ip=client_ip,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/analyze/kubernetes", response_model=AnalysisResponse)
+async def analyze_kubernetes(
+    request: AnalysisRequest,
+    http_request: Request,
+    _: bool = Depends(verify_api_key)
+):
+    """Analyze Kubernetes cluster health and operational status"""
+    start_time = time.time()
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    
+    ActionLogger.log_api_request(
+        logger,
+        endpoint="/analyze/kubernetes",
+        method="POST",
+        client_ip=client_ip,
+        timeframe=request.timeframe,
+        focus_areas=request.focus_areas
+    )
+    
+    try:
+        # Convert timeframe to period_hours
+        timeframe_to_hours = {"1h": 1, "6h": 6, "12h": 12, "24h": 24, "7d": 168}
+        period_hours = timeframe_to_hours.get(request.timeframe, 24)
+        
+        # Generate report using the report generator (saves to disk automatically)
+        report = await app.state.report_generator.generate_report(
+            level=ReportLevel.EXECUTIVE,
+            period_hours=period_hours,
+            focus_areas=request.focus_areas or ["kubernetes", "cluster_health", "error_analysis"]
+        )
+        
+        # Extract the raw analysis data from the report
+        analysis = {
+            "timestamp": report.metadata.created_at.isoformat(),
+            "timeframe": request.timeframe,
+            "ai_analysis": report.ai_analysis,
+            "executive_summary": {
+                "threat_level": report.executive_summary.threat_level,
+                "security_score": report.executive_summary.security_score,
+                "key_findings": report.executive_summary.key_findings,
+                "recommendations": report.executive_summary.recommendations
+            },
+            "report_id": report.metadata.id
+        }
+        
+        duration_ms = (time.time() - start_time) * 1000
+        
+        ActionLogger.log_api_request(
+            logger,
+            endpoint="/analyze/kubernetes",
+            method="POST",
+            status_code=200,
+            duration_ms=duration_ms,
+            client_ip=client_ip,
+            timeframe=request.timeframe,
+            report_id=report.metadata.id
+        )
+        
+        return AnalysisResponse(
+            success=True,
+            analysis=analysis,
+            timestamp=analysis.get("timestamp"),
+            metadata={"source": "kubernetes", "timeframe": request.timeframe, "report_id": report.metadata.id}
+        )
+        
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        
+        ActionLogger.log_api_request(
+            logger,
+            endpoint="/analyze/kubernetes",
+            method="POST",
+            status_code=500,
+            duration_ms=duration_ms,
+            client_ip=client_ip,
+            error=str(e)
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/query", response_model=QueryResponse)
 async def natural_language_query(
     request: QueryRequest,
+    http_request: Request,
     _: bool = Depends(verify_api_key)
 ):
     """Process natural language queries about security data"""
+    start_time = time.time()
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    
+    ActionLogger.log_api_request(
+        logger,
+        endpoint="/query",
+        method="POST",
+        client_ip=client_ip,
+        query_length=len(request.query),
+        has_context=request.context is not None
+    )
+    
     try:
         ai_engine = app.state.ai_engine
         
         response = await ai_engine.process_query(
             query=request.query,
             context=request.context
+        )
+        
+        duration_ms = (time.time() - start_time) * 1000
+        
+        ActionLogger.log_api_request(
+            logger,
+            endpoint="/query",
+            method="POST",
+            status_code=200,
+            duration_ms=duration_ms,
+            client_ip=client_ip,
+            query_length=len(request.query),
+            response_length=len(response["response"])
         )
         
         return QueryResponse(
@@ -190,7 +406,17 @@ async def natural_language_query(
         )
         
     except Exception as e:
-        logger.error(f"Error processing query: {e}")
+        duration_ms = (time.time() - start_time) * 1000
+        
+        ActionLogger.log_api_request(
+            logger,
+            endpoint="/query",
+            method="POST",
+            status_code=500,
+            duration_ms=duration_ms,
+            client_ip=client_ip,
+            error=str(e)
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -231,6 +457,107 @@ async def get_openapi_yaml():
         raise HTTPException(status_code=404, detail="OpenAPI specification not found")
 
 
+# Data Collection Endpoints
+
+@app.get("/logs/all")
+async def get_all_logs(
+    hours: int = 24,
+    include_files: bool = False,
+    _: bool = Depends(verify_api_key)
+):
+    """
+    Get all logs from all applications/sources
+    
+    Parameters:
+    - hours: Time window in hours (default: 24)
+    - include_files: Include raw file paths in response (default: False)
+    
+    Returns comprehensive log data from:
+    - Honeypot applications (Cowrie, Heralding)
+    - Zeek network monitoring
+    - Loki log aggregation
+    """
+    try:
+        data_collector = app.state.data_sources
+        
+        all_logs = await data_collector.get_all_logs(
+            hours=hours,
+            include_raw_files=include_files
+        )
+        
+        return {
+            "success": True,
+            "data": all_logs,
+            "metadata": {
+                "collection_time": all_logs["collection_timestamp"],
+                "time_window_hours": hours,
+                "total_entries": all_logs["summary"]["total_entries"],
+                "sources": list(all_logs["summary"]["by_source"].keys())
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error collecting all logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/logs/honeypot")
+async def get_honeypot_logs(
+    hours: int = 24,
+    limit: int = 1000,
+    _: bool = Depends(verify_api_key)
+):
+    """Get honeypot logs (Cowrie and Heralding)"""
+    try:
+        data_collector = app.state.data_sources
+        logs = await data_collector.get_honeypot_logs(hours=hours, limit=limit)
+        
+        return {
+            "success": True,
+            "count": len(logs),
+            "logs": logs
+        }
+    except Exception as e:
+        logger.error(f"Error getting honeypot logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/logs/zeek")
+async def get_zeek_logs(
+    log_type: Optional[str] = None,
+    hours: int = 24,
+    _: bool = Depends(verify_api_key)
+):
+    """
+    Get Zeek network monitoring logs
+    
+    Parameters:
+    - log_type: Specific log type (conn, dns, http, ssl, etc.) or None for all
+    - hours: Time window in hours
+    """
+    try:
+        data_collector = app.state.data_sources
+        
+        if log_type:
+            logs = await data_collector.get_local_zeek_logs(
+                log_types=[log_type],
+                hours=hours
+            )
+        else:
+            logs = await data_collector.get_local_zeek_logs(hours=hours)
+        
+        total_entries = sum(len(entries) for entries in logs.values())
+        
+        return {
+            "success": True,
+            "log_types": list(logs.keys()),
+            "total_entries": total_entries,
+            "logs": logs
+        }
+    except Exception as e:
+        logger.error(f"Error getting Zeek logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Report Management Endpoints
 
 @app.post("/reports/generate", response_model=dict)
@@ -267,7 +594,7 @@ async def list_reports(
     
     # Read reports from filesystem
     reports = []
-    reports_dir = Path("reports")
+    reports_dir = Path(settings.reports_dir)
     
     logger.info(f"Reports dir exists: {reports_dir.exists()}, path: {reports_dir.absolute()}")
     
@@ -316,7 +643,7 @@ async def list_reports(
 @app.get("/reports/latest/full")
 async def get_latest_report():
     """Return the most recently generated report with full content (public endpoint for Grafana)"""
-    reports_dir = Path("reports")
+    reports_dir = Path(settings.reports_dir)
 
     if not reports_dir.exists():
         # Return a placeholder structure instead of 404
@@ -389,7 +716,7 @@ async def get_latest_analysis_html():
     """Return the latest AI analysis as formatted HTML (public endpoint for Grafana iframe)"""
     import markdown
     
-    reports_dir = Path("reports")
+    reports_dir = Path(settings.reports_dir)
 
     if not reports_dir.exists():
         return HTMLResponse("<p>No reports available</p>")
@@ -430,9 +757,9 @@ async def get_latest_analysis_html():
         <!DOCTYPE html>
         <html>
         <head><meta charset="UTF-8"><title>AI Analysis</title></head>
-        <body style="font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5;">
-            <div style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                <h2 style="color: #ff6b6b; margin-top: 0;">⚠️ No Reports Available</h2>
+        <body style="font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #181B1F;">
+            <div style="background: #1F2329; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); color: #D8DEE9;">
+                <h2 style="color: #BF616A; margin-top: 0;">⚠️ No Reports Available</h2>
                 <p>No security reports have been generated yet. Trigger a report generation to see AI analysis here.</p>
             </div>
         </body>
@@ -454,7 +781,7 @@ async def get_latest_analysis_html():
     report_title = metadata.get("title", "AI Security Analysis")
     created_at = metadata.get("created_at", "Unknown")
     
-    # Wrap in styled HTML with full document structure
+    # Wrap in styled HTML with full document structure (dark theme)
     styled_html = f"""
     <!DOCTYPE html>
     <html>
@@ -467,37 +794,39 @@ async def get_latest_analysis_html():
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                 margin: 0;
                 padding: 20px;
-                background: #f5f5f5;
-                color: #333;
+                background: #181B1F;
+                color: #D8DEE9;
                 line-height: 1.8;
             }}
             .container {{
-                background: white;
+                background: #1F2329;
                 padding: 30px;
                 border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
                 max-width: 1200px;
                 margin: 0 auto;
             }}
             h1, h2, h3, h4 {{
-                color: #2c3e50;
+                color: #6E9ECF;
                 margin-top: 1.5em;
             }}
-            h1 {{ font-size: 2em; border-bottom: 3px solid #3498db; padding-bottom: 10px; }}
-            h2 {{ font-size: 1.6em; border-bottom: 2px solid #e0e0e0; padding-bottom: 8px; }}
-            h3 {{ font-size: 1.3em; color: #34495e; }}
+            h1 {{ font-size: 2em; border-bottom: 3px solid #4C9AFF; padding-bottom: 10px; }}
+            h2 {{ font-size: 1.6em; border-bottom: 2px solid #3A3F47; padding-bottom: 8px; }}
+            h3 {{ font-size: 1.3em; color: #88C0D0; }}
             p {{ margin: 1em 0; }}
             ul, ol {{ margin: 1em 0; padding-left: 2em; }}
             li {{ margin: 0.5em 0; }}
-            code {{ background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; }}
-            pre {{ background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; overflow-x: auto; }}
-            .meta {{ color: #7f8c8d; font-size: 0.9em; margin-bottom: 20px; padding: 10px; background: #ecf0f1; border-radius: 4px; }}
-            strong {{ color: #2c3e50; }}
-            hr {{ border: none; border-top: 1px solid #e0e0e0; margin: 2em 0; }}
+            code {{ background: #2E3440; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; color: #A3BE8C; }}
+            pre {{ background: #2E3440; color: #D8DEE9; padding: 15px; border-radius: 5px; overflow-x: auto; border: 1px solid #434C5E; }}
+            .meta {{ color: #81A1C1; font-size: 0.9em; margin-bottom: 20px; padding: 10px; background: #2E3440; border-radius: 4px; border-left: 3px solid #5E81AC; }}
+            strong {{ color: #88C0D0; }}
+            hr {{ border: none; border-top: 1px solid #3A3F47; margin: 2em 0; }}
             table {{ border-collapse: collapse; width: 100%; margin: 1em 0; }}
-            th, td {{ border: 1px solid #ddd; padding: 12px; text-align: left; }}
-            th {{ background-color: #3498db; color: white; }}
-            tr:nth-child(even) {{ background-color: #f9f9f9; }}
+            th, td {{ border: 1px solid #3A3F47; padding: 12px; text-align: left; }}
+            th {{ background-color: #5E81AC; color: #ECEFF4; }}
+            tr:nth-child(even) {{ background-color: #242933; }}
+            a {{ color: #88C0D0; }}
+            a:hover {{ color: #5E81AC; }}
         </style>
     </head>
     <body>
@@ -524,7 +853,7 @@ async def get_report(report_id: str, _: bool = Depends(verify_api_key)):
         import json
         from pathlib import Path
         
-        report_file = Path("reports") / f"{report_id}.json"
+        report_file = Path(settings.reports_dir) / f"{report_id}.json"
         if not report_file.exists():
             raise HTTPException(status_code=404, detail="Report not found")
         

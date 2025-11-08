@@ -21,11 +21,25 @@ class NetworkSecurityMCPServer:
     def _setup_tools(self):
         """Setup available MCP tools"""
         return {
+            "get_all_logs": {
+                "description": "Get comprehensive logs from all sources (honeypots, Zeek, Loki)",
+                "parameters": {
+                    "hours": {"type": "integer", "default": 24},
+                    "include_files": {"type": "boolean", "default": False}
+                }
+            },
             "get_honeypot_activity": {
                 "description": "Get recent honeypot activity and attack patterns",
                 "parameters": {
                     "hours": {"type": "integer", "default": 24},
                     "limit": {"type": "integer", "default": 100}
+                }
+            },
+            "get_zeek_logs": {
+                "description": "Get Zeek network monitoring logs by type",
+                "parameters": {
+                    "log_type": {"type": "string", "optional": True},
+                    "hours": {"type": "integer", "default": 24}
                 }
             },
             "get_network_metrics": {
@@ -54,8 +68,12 @@ class NetworkSecurityMCPServer:
     async def call_tool(self, name: str, arguments: Dict[str, Any]) -> List[Dict[str, str]]:
         """Handle tool calls"""
         
-        if name == "get_honeypot_activity":
+        if name == "get_all_logs":
+            return await self._get_all_logs(arguments)
+        elif name == "get_honeypot_activity":
             return await self._get_honeypot_activity(arguments)
+        elif name == "get_zeek_logs":
+            return await self._get_zeek_logs(arguments)
         elif name == "get_network_metrics":
             return await self._get_network_metrics(arguments)
         elif name == "get_security_alerts":
@@ -64,6 +82,83 @@ class NetworkSecurityMCPServer:
             return await self._analyze_threat_patterns(arguments)
         else:
             return [{"type": "text", "text": f"Unknown tool: {name}"}]
+    
+    async def _get_all_logs(self, args: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Get comprehensive logs from all sources"""
+        hours = args.get("hours", 24)
+        include_files = args.get("include_files", False)
+        
+        try:
+            all_logs = await self.data_collector.get_all_logs(
+                hours=hours,
+                include_raw_files=include_files
+            )
+            
+            summary = all_logs["summary"]
+            sources = all_logs["sources"]
+            
+            text = f"📊 **Comprehensive Log Analysis** (Last {hours}h):\n\n"
+            text += f"**Total Events:** {summary['total_entries']}\n\n"
+            text += "**Breakdown by Source:**\n"
+            
+            for source, count in summary["by_source"].items():
+                text += f"• {source}: {count:,} events\n"
+            
+            text += "\n**Honeypot Activity:**\n"
+            text += f"• Cowrie events: {len(sources['honeypot'].get('cowrie', []))}\n"
+            text += f"• Heralding events: {len(sources['honeypot'].get('heralding', []))}\n"
+            
+            text += "\n**Zeek Network Logs:**\n"
+            zeek_logs = sources.get("zeek", {})
+            for log_type, entries in zeek_logs.items():
+                if entries:
+                    text += f"• {log_type}: {len(entries)} entries\n"
+            
+            text += "\n**Loki Aggregation:**\n"
+            text += f"• Honeypot entries: {len(sources['loki'].get('honeypot_entries', []))}\n"
+            text += f"• Zeek entries: {len(sources['loki'].get('zeek_entries', []))}\n"
+            
+            if include_files:
+                text += "\n**File Paths Available:**\n"
+                file_paths = all_logs.get("file_paths", {})
+                text += f"• Honeypot files: {len(file_paths.get('honeypot', {}).get('cowrie', []))} + {len(file_paths.get('honeypot', {}).get('heralding', []))}\n"
+                text += f"• Zeek log files: {len(file_paths.get('zeek', []))}\n"
+            
+            return [{"type": "text", "text": text}]
+            
+        except Exception as e:
+            return [{"type": "text", "text": f"Error getting all logs: {str(e)}"}]
+    
+    async def _get_zeek_logs(self, args: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Get Zeek network monitoring logs"""
+        log_type = args.get("log_type")
+        hours = args.get("hours", 24)
+        
+        try:
+            if log_type:
+                zeek_logs = await self.data_collector.get_local_zeek_logs(
+                    log_types=[log_type],
+                    hours=hours
+                )
+            else:
+                zeek_logs = await self.data_collector.get_local_zeek_logs(hours=hours)
+            
+            text = f"🔍 **Zeek Logs** "
+            if log_type:
+                text += f"({log_type}) "
+            text += f"(Last {hours}h):\n\n"
+            
+            total_entries = sum(len(entries) for entries in zeek_logs.values())
+            text += f"**Total Entries:** {total_entries:,}\n\n"
+            text += "**Log Types:**\n"
+            
+            for ltype, entries in zeek_logs.items():
+                text += f"• {ltype}: {len(entries):,} entries\n"
+            
+            return [{"type": "text", "text": text}]
+            
+        except Exception as e:
+            return [{"type": "text", "text": f"Error getting Zeek logs: {str(e)}"}]
     
     async def _get_honeypot_activity(self, args: Dict[str, Any]) -> List[Dict[str, str]]:
         """Get honeypot activity data"""

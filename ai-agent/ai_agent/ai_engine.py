@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 import httpx
@@ -11,6 +12,7 @@ from .config import settings
 from .data_sources import DataCollector
 from .mcp.server import mcp_server
 from .prompts import prompt_templates, PromptConfig
+from .logging_utils import ActionLogger
 
 logger = structlog.get_logger()
 
@@ -45,73 +47,159 @@ class AIEngine:
     
     async def initialize(self):
         """Initialize the AI engine"""
+        ActionLogger.log_service_action(
+            logger,
+            action="ai_engine_initialize",
+            status="started",
+            ollama_url=settings.ollama_url,
+            model=settings.ollama_model
+        )
+        
         try:
             # Test remote Ollama connection
             response = await self.http_client.get(f"{settings.ollama_url}/api/tags")
             if response.status_code == 200:
                 models = response.json()
                 available_models = [m['name'] for m in models.get('models', [])]
-                logger.info(f"Connected to remote Ollama at {settings.ollama_url}")
-                logger.info(f"Available models: {available_models}")
+                
+                ActionLogger.log_service_action(
+                    logger,
+                    action="ollama_connection_test",
+                    status="completed",
+                    ollama_url=settings.ollama_url,
+                    available_models=available_models,
+                    model_count=len(available_models)
+                )
                 
                 # Check if our configured model is available
                 if settings.ollama_model not in available_models:
-                    logger.warning(f"Configured model '{settings.ollama_model}' not found. Available: {available_models}")
-                    logger.info("Consider pulling the model: ollama pull llama3.1:8b")
+                    ActionLogger.log_service_action(
+                        logger,
+                        action="model_availability_check",
+                        status="failed",
+                        configured_model=settings.ollama_model,
+                        available_models=available_models,
+                        warning="Model not found"
+                    )
                 else:
-                    logger.info(f"Model '{settings.ollama_model}' is ready")
+                    ActionLogger.log_service_action(
+                        logger,
+                        action="model_availability_check",
+                        status="completed",
+                        model=settings.ollama_model
+                    )
             else:
-                logger.warning(f"Could not connect to remote Ollama at {settings.ollama_url} - AI features may be limited")
+                ActionLogger.log_service_action(
+                    logger,
+                    action="ollama_connection_test",
+                    status="failed",
+                    ollama_url=settings.ollama_url,
+                    status_code=response.status_code
+                )
         except Exception as e:
-            logger.warning(f"Remote Ollama connection failed: {e} - AI features may be limited")
+            ActionLogger.log_service_action(
+                logger,
+                action="ai_engine_initialize",
+                status="failed",
+                error=str(e),
+                ollama_url=settings.ollama_url
+            )
     
     async def analyze_honeypot(self, timeframe: str = "24h", focus_areas: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Analyze honeypot activity using AI"""
+        """Analyze honeypot activity using AI with comprehensive log data"""
+        start_time = time.time()
+        
+        ActionLogger.log_ai_action(
+            logger,
+            action="honeypot_analysis",
+            model=settings.ollama_model,
+            status="started",
+            timeframe=timeframe,
+            focus_areas=focus_areas or ["general"]
+        )
+        
         try:
-            # Collect honeypot data using MCP
-            tools_result = await mcp_server.call_tool(
-                "get_honeypot_activity",
-                {"hours": self._timeframe_to_hours(timeframe), "limit": 200}
-            )
+            # Get comprehensive logs from all sources
+            hours = self._timeframe_to_hours(timeframe)
+            all_logs = await self.data_collector.get_all_logs(hours=hours, include_raw_files=False)
             
-            honeypot_data = tools_result[0]["text"] if tools_result else "No honeypot data available"
+            # Extract honeypot-specific data
+            cowrie_count = len(all_logs["sources"]["honeypot"].get("cowrie", []))
+            heralding_count = len(all_logs["sources"]["honeypot"].get("heralding", []))
+            
+            # Also get Zeek data for correlation
+            zeek_summary = {
+                "conn": len(all_logs["sources"]["zeek"].get("conn", [])),
+                "dns": len(all_logs["sources"]["zeek"].get("dns", [])),
+                "http": len(all_logs["sources"]["zeek"].get("http", []))
+            }
             
             # Get threat patterns
-            patterns_result = await mcp_server.call_tool(
-                "analyze_threat_patterns",
-                {"timeframe": timeframe, "focus": "all"}
+            threat_patterns = await self.data_collector.analyze_threats(
+                timeframe=timeframe, focus="all"
             )
             
-            threat_patterns = patterns_result[0]["text"] if patterns_result else "No threat patterns found"
+            # Create comprehensive analysis prompt
+            honeypot_summary = {
+                "cowrie_events": cowrie_count,
+                "heralding_events": heralding_count,
+                "total_honeypot_events": cowrie_count + heralding_count,
+                "unique_ips": len(set(
+                    log.get("src_ip", "") for log in all_logs["sources"]["honeypot"].get("cowrie", [])
+                    if log.get("src_ip")
+                ))
+            }
             
-            # Truncate large data sets to avoid overwhelming the model
-            honeypot_data = self._truncate_data(honeypot_data, max_length=4000)
-            threat_patterns = self._truncate_data(threat_patterns, max_length=2000)
-            
-            # Create analysis prompt using template
             prompt = prompt_templates.get_honeypot_prompt(
-                honeypot_data=honeypot_data,
-                threat_patterns=threat_patterns,
+                honeypot_data=json.dumps(honeypot_summary, indent=2),
+                threat_patterns=self._truncate_data(json.dumps(threat_patterns, indent=2), 2000),
                 focus_areas=focus_areas or ["general security analysis"],
-                timeframe=timeframe
+                timeframe=timeframe,
+                zeek_correlation=json.dumps(zeek_summary, indent=2)
             )
             
-            # Get AI analysis with appropriate parameters
+            # Get AI analysis
             ai_response = await self._query_ollama(prompt, analysis_type="honeypot")
+            
+            duration_ms = (time.time() - start_time) * 1000
+            
+            ActionLogger.log_ai_action(
+                logger,
+                action="honeypot_analysis",
+                model=settings.ollama_model,
+                status="completed",
+                duration_ms=duration_ms,
+                timeframe=timeframe,
+                honeypot_events=honeypot_summary["total_honeypot_events"],
+                response_length=len(ai_response)
+            )
             
             return {
                 "timestamp": datetime.now().isoformat(),
                 "timeframe": timeframe,
                 "ai_analysis": ai_response,
                 "raw_data": {
-                    "honeypot_activity": honeypot_data,
+                    "honeypot_summary": honeypot_summary,
+                    "zeek_summary": zeek_summary,
                     "threat_patterns": threat_patterns
+                },
+                "comprehensive_logs": {
+                    "total_entries": all_logs["summary"]["total_entries"],
+                    "sources": list(all_logs["summary"]["by_source"].keys())
                 },
                 "focus_areas": focus_areas or ["general"]
             }
             
         except Exception as e:
-            logger.error(f"Error in honeypot analysis: {e}")
+            duration_ms = (time.time() - start_time) * 1000
+            ActionLogger.log_ai_action(
+                logger,
+                action="honeypot_analysis",
+                model=settings.ollama_model,
+                status="failed",
+                duration_ms=duration_ms,
+                error=str(e)
+            )
             return {
                 "timestamp": datetime.now().isoformat(),
                 "error": str(e),
@@ -119,63 +207,267 @@ class AIEngine:
             }
     
     async def analyze_network(self, timeframe: str = "24h", focus_areas: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Analyze network security and system metrics"""
+        """Analyze network security and system metrics with comprehensive Zeek data"""
+        start_time = time.time()
+        
+        ActionLogger.log_ai_action(
+            logger,
+            action="network_analysis",
+            model=settings.ollama_model,
+            status="started",
+            timeframe=timeframe,
+            focus_areas=focus_areas or ["general"]
+        )
+        
         try:
-            # Get network metrics
-            metrics_tasks = []
-            for metric in ["cpu_usage", "memory_usage", "network_connections"]:
-                task = mcp_server.call_tool("get_network_metrics", {"metric": metric, "duration": "1h"})
-                metrics_tasks.append(task)
+            # Get comprehensive logs
+            hours = self._timeframe_to_hours(timeframe)
+            all_logs = await self.data_collector.get_all_logs(hours=hours, include_raw_files=False)
             
-            metrics_results = await asyncio.gather(*metrics_tasks, return_exceptions=True)
+            # Extract Zeek network analysis
+            zeek_logs = all_logs["sources"].get("zeek", {})
+            network_summary = {
+                "total_connections": len(zeek_logs.get("conn", [])),
+                "dns_queries": len(zeek_logs.get("dns", [])),
+                "http_requests": len(zeek_logs.get("http", [])),
+                "ssl_connections": len(zeek_logs.get("ssl", [])),
+                "ssh_attempts": len(zeek_logs.get("ssh", [])),
+                "file_transfers": len(zeek_logs.get("files", [])),
+                "weird_events": len(zeek_logs.get("weird", [])),
+                "security_notices": len(zeek_logs.get("notice", []))
+            }
+            
+            # Get Prometheus metrics for correlation
+            metrics_data = {}
+            for metric in ["cpu_usage", "memory_usage", "network_connections"]:
+                try:
+                    result = await self.data_collector.get_prometheus_metrics(metric, "1h")
+                    metrics_data[metric] = result
+                except Exception as e:
+                    logger.warning(f"Could not fetch {metric}: {e}")
             
             # Get security alerts
-            alerts_result = await mcp_server.call_tool(
-                "get_security_alerts",
-                {"severity": "all", "source": "all"}
-            )
+            alerts = await self.data_collector.get_security_alerts(severity="all", source="all")
             
-            # Compile data for analysis
-            network_data = ""
-            for i, result in enumerate(metrics_results):
-                if not isinstance(result, Exception) and result:
-                    metric_name = ["cpu_usage", "memory_usage", "network_connections"][i]
-                    network_data += f"\n{metric_name.upper()}:\n{result[0]['text']}\n"
-            
-            alerts_data = alerts_result[0]["text"] if alerts_result else "No alerts found"
-            
-            # Create analysis prompt using template
+            # Create comprehensive analysis prompt
             prompt = prompt_templates.get_network_prompt(
-                network_metrics=network_data,
-                security_alerts=alerts_data,
+                network_metrics=json.dumps(network_summary, indent=2),
+                security_alerts=json.dumps(alerts[:20], indent=2) if alerts else "No alerts",
                 focus_areas=focus_areas or ["general network security"],
-                timeframe=timeframe
+                timeframe=timeframe,
+                system_metrics=json.dumps(metrics_data, indent=2)
             )
             
-            # Get AI analysis with appropriate parameters
+            # Get AI analysis
             ai_response = await self._query_ollama(prompt, analysis_type="network")
+            
+            duration_ms = (time.time() - start_time) * 1000
+            
+            ActionLogger.log_ai_action(
+                logger,
+                action="network_analysis",
+                model=settings.ollama_model,
+                status="completed",
+                duration_ms=duration_ms,
+                timeframe=timeframe,
+                total_connections=network_summary["total_connections"],
+                response_length=len(ai_response)
+            )
             
             return {
                 "timestamp": datetime.now().isoformat(),
                 "timeframe": timeframe,
                 "ai_analysis": ai_response,
                 "raw_data": {
-                    "network_metrics": network_data,
-                    "security_alerts": alerts_data
+                    "zeek_summary": network_summary,
+                    "system_metrics": metrics_data,
+                    "security_alerts": alerts[:20] if alerts else []
+                },
+                "comprehensive_logs": {
+                    "total_entries": all_logs["summary"]["total_entries"],
+                    "zeek_log_types": list(zeek_logs.keys())
                 },
                 "focus_areas": focus_areas or ["general"]
             }
             
         except Exception as e:
-            logger.error(f"Error in network analysis: {e}")
+            duration_ms = (time.time() - start_time) * 1000
+            ActionLogger.log_ai_action(
+                logger,
+                action="network_analysis",
+                model=settings.ollama_model,
+                status="failed",
+                duration_ms=duration_ms,
+                error=str(e)
+            )
             return {
                 "timestamp": datetime.now().isoformat(),
                 "error": str(e),
                 "ai_analysis": "Analysis unavailable due to error"
             }
     
+    async def analyze_kubernetes_cluster(self, timeframe: str = "24h", focus_areas: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Analyze Kubernetes cluster health and operational status"""
+        start_time = time.time()
+        
+        ActionLogger.log_ai_action(
+            logger,
+            action="kubernetes_analysis",
+            model=settings.ollama_model,
+            status="started",
+            timeframe=timeframe,
+            focus_areas=focus_areas or ["cluster_health"]
+        )
+        
+        try:
+            # Get Kubernetes metrics from Prometheus
+            hours = self._timeframe_to_hours(timeframe)
+            k8s_metrics = await self.data_collector.get_kubernetes_metrics(hours=hours)
+            
+            # Process and summarize error metrics
+            error_summary = {
+                "oom_events": self._count_metric_values(k8s_metrics["errors"].get("oom_events", {})),
+                "memory_failures": self._count_metric_values(k8s_metrics["errors"].get("memory_failures", {})),
+                "network_rx_errors": self._count_metric_values(k8s_metrics["errors"].get("network_rx_errors", {})),
+                "network_tx_errors": self._count_metric_values(k8s_metrics["errors"].get("network_tx_errors", {})),
+                "scrape_errors": self._count_metric_values(k8s_metrics["errors"].get("scrape_errors", {}))
+            }
+            
+            # Process resource usage metrics
+            resource_summary = {
+                "cpu_usage_by_namespace": self._aggregate_by_namespace(k8s_metrics["resource_usage"].get("cpu_usage", {})),
+                "memory_usage_by_namespace": self._aggregate_by_namespace(k8s_metrics["resource_usage"].get("memory_usage", {})),
+                "top_cpu_pods": self._get_top_pods(k8s_metrics["resource_usage"].get("cpu_usage", {}), limit=10),
+                "top_memory_pods": self._get_top_pods(k8s_metrics["resource_usage"].get("memory_usage", {}), limit=10),
+                "network_throughput": {
+                    "rx_bytes_per_sec": self._count_metric_values(k8s_metrics["resource_usage"].get("network_rx_bytes", {})),
+                    "tx_bytes_per_sec": self._count_metric_values(k8s_metrics["resource_usage"].get("network_tx_bytes", {}))
+                }
+            }
+            
+            # Create comprehensive analysis prompt
+            prompt = prompt_templates.get_kubernetes_health_prompt(
+                kubernetes_metrics=json.dumps(k8s_metrics, indent=2),
+                error_summary=json.dumps(error_summary, indent=2),
+                resource_trends=json.dumps(resource_summary, indent=2),
+                focus_areas=focus_areas or ["cluster_health", "error_analysis", "capacity_planning"],
+                timeframe=timeframe
+            )
+            
+            # Get AI analysis
+            ai_response = await self._query_ollama(prompt, analysis_type="kubernetes")
+            
+            duration_ms = (time.time() - start_time) * 1000
+            
+            ActionLogger.log_ai_action(
+                logger,
+                action="kubernetes_analysis",
+                model=settings.ollama_model,
+                status="completed",
+                duration_ms=duration_ms,
+                timeframe=timeframe,
+                total_errors=sum(error_summary.values()),
+                response_length=len(ai_response)
+            )
+            
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "timeframe": timeframe,
+                "ai_analysis": ai_response,
+                "cluster_metrics": {
+                    "errors": error_summary,
+                    "resources": resource_summary,
+                    "collection_time": k8s_metrics.get("collection_time")
+                },
+                "raw_data": k8s_metrics,
+                "focus_areas": focus_areas or ["cluster_health"]
+            }
+            
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            ActionLogger.log_ai_action(
+                logger,
+                action="kubernetes_analysis",
+                model=settings.ollama_model,
+                status="failed",
+                duration_ms=duration_ms,
+                error=str(e)
+            )
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "error": str(e),
+                "ai_analysis": "Kubernetes analysis unavailable due to error"
+            }
+    
+    def _count_metric_values(self, metric_data: Dict[str, Any]) -> int:
+        """Count total values from Prometheus metric results"""
+        if not metric_data or "result" not in metric_data:
+            return 0
+        
+        total = 0
+        for result in metric_data["result"]:
+            if "value" in result and len(result["value"]) > 1:
+                try:
+                    total += float(result["value"][1])
+                except (ValueError, TypeError):
+                    pass
+        return int(total)
+    
+    def _aggregate_by_namespace(self, metric_data: Dict[str, Any]) -> Dict[str, float]:
+        """Aggregate metric values by namespace"""
+        if not metric_data or "result" not in metric_data:
+            return {}
+        
+        namespace_totals = {}
+        for result in metric_data["result"]:
+            namespace = result.get("metric", {}).get("namespace", "unknown")
+            if "value" in result and len(result["value"]) > 1:
+                try:
+                    value = float(result["value"][1])
+                    namespace_totals[namespace] = namespace_totals.get(namespace, 0) + value
+                except (ValueError, TypeError):
+                    pass
+        return namespace_totals
+    
+    def _get_top_pods(self, metric_data: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
+        """Get top N pods by metric value"""
+        if not metric_data or "result" not in metric_data:
+            return []
+        
+        pod_values = []
+        for result in metric_data["result"]:
+            metric = result.get("metric", {})
+            namespace = metric.get("namespace", "unknown")
+            pod = metric.get("pod", "unknown")
+            
+            if "value" in result and len(result["value"]) > 1:
+                try:
+                    value = float(result["value"][1])
+                    pod_values.append({
+                        "namespace": namespace,
+                        "pod": pod,
+                        "value": value
+                    })
+                except (ValueError, TypeError):
+                    pass
+        
+        # Sort by value descending and return top N
+        pod_values.sort(key=lambda x: x["value"], reverse=True)
+        return pod_values[:limit]
+    
     async def process_query(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Process natural language queries about security data"""
+        start_time = time.time()
+        
+        ActionLogger.log_ai_action(
+            logger,
+            action="query_processing",
+            model=settings.ollama_model,
+            status="started",
+            query_length=len(query),
+            has_context=context is not None
+        )
+        
         try:
             # Determine what data to fetch based on query
             data_sources = self._determine_data_sources(query)
@@ -221,6 +513,20 @@ class AIEngine:
             # Get AI response with appropriate parameters
             ai_response = await self._query_ollama(prompt, analysis_type="query")
             
+            duration_ms = (time.time() - start_time) * 1000
+            
+            ActionLogger.log_ai_action(
+                logger,
+                action="query_processing",
+                model=settings.ollama_model,
+                status="completed",
+                duration_ms=duration_ms,
+                query_length=len(query),
+                response_length=len(ai_response),
+                data_sources=data_sources,
+                sources_used=sources_used
+            )
+            
             return {
                 "timestamp": datetime.now().isoformat(),
                 "response": ai_response,
@@ -233,7 +539,16 @@ class AIEngine:
             }
             
         except Exception as e:
-            logger.error(f"Error processing query: {e}")
+            duration_ms = (time.time() - start_time) * 1000
+            ActionLogger.log_ai_action(
+                logger,
+                action="query_processing",
+                model=settings.ollama_model,
+                status="failed",
+                duration_ms=duration_ms,
+                query_length=len(query),
+                error=str(e)
+            )
             return {
                 "timestamp": datetime.now().isoformat(),
                 "response": f"I encountered an error while processing your query: {str(e)}",
@@ -317,8 +632,17 @@ class AIEngine:
         
         for attempt in range(max_retries):
             try:
-                logger.info(f"Querying Ollama at {settings.ollama_url} with model {settings.ollama_model} (attempt {attempt + 1}/{max_retries})")
-                logger.debug(f"Prompt length: {len(full_prompt)} chars, max_tokens: {payload['options']['num_predict']}")
+                ActionLogger.log_ai_action(
+                    logger,
+                    action="ollama_query",
+                    model=settings.ollama_model,
+                    status="started",
+                    prompt_length=len(full_prompt),
+                    attempt=f"{attempt + 1}/{max_retries}",
+                    analysis_type=analysis_type,
+                    temperature=payload['options']['temperature'],
+                    max_tokens=payload['options']['num_predict']
+                )
                 
                 response = await self.http_client.post(
                     f"{settings.ollama_url}/api/generate",
@@ -329,18 +653,30 @@ class AIEngine:
                     result = response.json()
                     ai_response = result.get("response", "").strip()
                     
-                    # Debug log the result structure
-                    logger.debug(f"Ollama result keys: {list(result.keys())}")
-                    logger.debug(f"Done: {result.get('done')}, Context length: {len(result.get('context', []))}")
-                    
                     if ai_response:
-                        logger.info(f"Successfully received response from Ollama ({len(ai_response)} chars)")
+                        ActionLogger.log_ai_action(
+                            logger,
+                            action="ollama_query",
+                            model=settings.ollama_model,
+                            status="completed",
+                            response_length=len(ai_response),
+                            attempt=f"{attempt + 1}/{max_retries}",
+                            analysis_type=analysis_type,
+                            context_length=len(result.get('context', []))
+                        )
                         
                         # Validate response is not just whitespace or error message
                         if len(ai_response) < 50 and any(word in ai_response.lower() for word in ['error', 'failed', 'unavailable']):
-                            logger.warning(f"Received suspiciously short response: {ai_response}")
+                            ActionLogger.log_ai_action(
+                                logger,
+                                action="ollama_query",
+                                model=settings.ollama_model,
+                                status="failed",
+                                warning="Suspiciously short response",
+                                response=ai_response,
+                                attempt=f"{attempt + 1}/{max_retries}"
+                            )
                             if attempt < max_retries - 1:
-                                logger.info(f"Retrying in {retry_delay} seconds...")
                                 await asyncio.sleep(retry_delay)
                                 retry_delay *= 2
                                 continue

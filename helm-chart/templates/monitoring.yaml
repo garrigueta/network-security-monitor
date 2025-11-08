@@ -19,6 +19,7 @@ spec:
         {{- include "network-security-monitor.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: prometheus
     spec:
+      serviceAccountName: prometheus
       securityContext:
         fsGroup: 65534
         runAsUser: 65534
@@ -180,10 +181,13 @@ spec:
         - name: config
           mountPath: /etc/promtail
         - name: zeek-logs
-          mountPath: /mnt/zeek-logs
+          mountPath: /mnt/ssd-logs/zeek
           readOnly: true
         - name: honeypot-logs
-          mountPath: /mnt/honeypot-logs
+          mountPath: /mnt/ssd-logs/honeypot
+          readOnly: true
+        - name: ai-agent-logs
+          mountPath: /mnt/ssd-logs/ai-agent
           readOnly: true
         resources:
           {{- toYaml .Values.monitoring.promtail.resources | nindent 10 }}
@@ -197,4 +201,8 @@ spec:
       - name: honeypot-logs
         persistentVolumeClaim:
           claimName: honeypot-logs
+      - name: ai-agent-logs
+        hostPath:
+          path: /mnt/ssd-logs/ai-agent
+          type: DirectoryOrCreate
 {{- end }}
