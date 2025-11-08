@@ -2,11 +2,12 @@
 
 import asyncio
 import json
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-from fastapi import FastAPI, HTTPException, Depends, Security
+from fastapi import FastAPI, HTTPException, Depends, Security, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -28,6 +29,7 @@ from .models import (
     QueryRequest,
     QueryResponse
 )
+from ..logging_utils import ActionLogger
 
 logger = structlog.get_logger()
 security = HTTPBearer(auto_error=False)
@@ -37,7 +39,13 @@ security = HTTPBearer(auto_error=False)
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
     # Startup
-    logger.info("Starting AI Agent API...")
+    ActionLogger.log_service_action(
+        logger,
+        action="api_startup",
+        status="started",
+        host=settings.api_host,
+        port=settings.api_port
+    )
     
     # Initialize AI engine
     app.state.ai_engine = AIEngine()
@@ -59,17 +67,33 @@ async def lifespan(app: FastAPI):
     )
     await app.state.report_scheduler.start()
     
-    logger.info("AI Agent API started successfully")
+    ActionLogger.log_service_action(
+        logger,
+        action="api_startup",
+        status="completed",
+        host=settings.api_host,
+        port=settings.api_port
+    )
     
     yield
     
     # Shutdown
-    logger.info("Shutting down AI Agent API...")
+    ActionLogger.log_service_action(
+        logger,
+        action="api_shutdown",
+        status="started"
+    )
+    
     if hasattr(app.state, 'report_scheduler'):
         await app.state.report_scheduler.stop()
     if hasattr(app.state, 'ai_engine'):
         await app.state.ai_engine.close()
-    logger.info("AI Agent API shut down")
+    
+    ActionLogger.log_service_action(
+        logger,
+        action="api_shutdown",
+        status="completed"
+    )
 
 
 # Create FastAPI app
@@ -118,15 +142,40 @@ async def health_check():
 @app.post("/analyze/honeypot", response_model=AnalysisResponse)
 async def analyze_honeypot(
     request: AnalysisRequest,
+    http_request: Request,
     _: bool = Depends(verify_api_key)
 ):
     """Analyze honeypot activity and threats"""
+    start_time = time.time()
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    
+    ActionLogger.log_api_request(
+        logger,
+        endpoint="/analyze/honeypot",
+        method="POST",
+        client_ip=client_ip,
+        timeframe=request.timeframe,
+        focus_areas=request.focus_areas
+    )
+    
     try:
         ai_engine = app.state.ai_engine
         
         analysis = await ai_engine.analyze_honeypot(
             timeframe=request.timeframe,
             focus_areas=request.focus_areas
+        )
+        
+        duration_ms = (time.time() - start_time) * 1000
+        
+        ActionLogger.log_api_request(
+            logger,
+            endpoint="/analyze/honeypot",
+            method="POST",
+            status_code=200,
+            duration_ms=duration_ms,
+            client_ip=client_ip,
+            timeframe=request.timeframe
         )
         
         return AnalysisResponse(
@@ -137,22 +186,57 @@ async def analyze_honeypot(
         )
         
     except Exception as e:
-        logger.error(f"Error analyzing honeypot: {e}")
+        duration_ms = (time.time() - start_time) * 1000
+        
+        ActionLogger.log_api_request(
+            logger,
+            endpoint="/analyze/honeypot",
+            method="POST",
+            status_code=500,
+            duration_ms=duration_ms,
+            client_ip=client_ip,
+            error=str(e)
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/analyze/network", response_model=AnalysisResponse)
 async def analyze_network(
     request: AnalysisRequest,
+    http_request: Request,
     _: bool = Depends(verify_api_key)
 ):
     """Analyze network security and system metrics"""
+    start_time = time.time()
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    
+    ActionLogger.log_api_request(
+        logger,
+        endpoint="/analyze/network",
+        method="POST",
+        client_ip=client_ip,
+        timeframe=request.timeframe,
+        focus_areas=request.focus_areas
+    )
+    
     try:
         ai_engine = app.state.ai_engine
         
         analysis = await ai_engine.analyze_network(
             timeframe=request.timeframe,
             focus_areas=request.focus_areas
+        )
+        
+        duration_ms = (time.time() - start_time) * 1000
+        
+        ActionLogger.log_api_request(
+            logger,
+            endpoint="/analyze/network",
+            method="POST",
+            status_code=200,
+            duration_ms=duration_ms,
+            client_ip=client_ip,
+            timeframe=request.timeframe
         )
         
         return AnalysisResponse(
@@ -163,22 +247,58 @@ async def analyze_network(
         )
         
     except Exception as e:
-        logger.error(f"Error analyzing network: {e}")
+        duration_ms = (time.time() - start_time) * 1000
+        
+        ActionLogger.log_api_request(
+            logger,
+            endpoint="/analyze/network",
+            method="POST",
+            status_code=500,
+            duration_ms=duration_ms,
+            client_ip=client_ip,
+            error=str(e)
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/query", response_model=QueryResponse)
 async def natural_language_query(
     request: QueryRequest,
+    http_request: Request,
     _: bool = Depends(verify_api_key)
 ):
     """Process natural language queries about security data"""
+    start_time = time.time()
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    
+    ActionLogger.log_api_request(
+        logger,
+        endpoint="/query",
+        method="POST",
+        client_ip=client_ip,
+        query_length=len(request.query),
+        has_context=request.context is not None
+    )
+    
     try:
         ai_engine = app.state.ai_engine
         
         response = await ai_engine.process_query(
             query=request.query,
             context=request.context
+        )
+        
+        duration_ms = (time.time() - start_time) * 1000
+        
+        ActionLogger.log_api_request(
+            logger,
+            endpoint="/query",
+            method="POST",
+            status_code=200,
+            duration_ms=duration_ms,
+            client_ip=client_ip,
+            query_length=len(request.query),
+            response_length=len(response["response"])
         )
         
         return QueryResponse(
@@ -190,7 +310,17 @@ async def natural_language_query(
         )
         
     except Exception as e:
-        logger.error(f"Error processing query: {e}")
+        duration_ms = (time.time() - start_time) * 1000
+        
+        ActionLogger.log_api_request(
+            logger,
+            endpoint="/query",
+            method="POST",
+            status_code=500,
+            duration_ms=duration_ms,
+            client_ip=client_ip,
+            error=str(e)
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 

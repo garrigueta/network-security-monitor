@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
     log_format: str = Field(default="json", env="LOG_FORMAT")
+    log_file: Optional[str] = Field(default="/mnt/ssd-logs/ai-agent/actions.log", env="LOG_FILE")
+    log_to_file: bool = Field(default=True, env="LOG_TO_FILE")
+    log_rotation_size: str = Field(default="10MB", env="LOG_ROTATION_SIZE")
+    log_retention_count: int = Field(default=10, env="LOG_RETENTION_COUNT")
     
     # Security
     api_key_header: str = Field(default="X-API-Key", env="API_KEY_HEADER")

@@ -2,33 +2,26 @@
 
 import asyncio
 import sys
-import structlog
 import uvicorn
 
 from .config import settings
 from .api.main import app
+from .logging_utils import configure_logging, ActionLogger
 
-# Configure structured logging
-structlog.configure(
-    processors=[
-        structlog.stdlib.filter_by_level,
-        structlog.stdlib.add_log_level,
-        structlog.stdlib.add_logger_name,
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.JSONRenderer() if settings.log_format == "json" else structlog.dev.ConsoleRenderer(),
-    ],
-    wrapper_class=structlog.stdlib.BoundLogger,
-    logger_factory=structlog.stdlib.LoggerFactory(),
-    cache_logger_on_first_use=True,
-)
-
-logger = structlog.get_logger()
+# Configure logging with file support
+logger = configure_logging()
 
 
 async def main():
     """Main entry point"""
-    logger.info("Starting Network Security AI Agent")
-    logger.info(f"Configuration: API={settings.api_host}:{settings.api_port}, Ollama={settings.ollama_url}")
+    ActionLogger.log_service_action(
+        logger,
+        action="ai_agent_startup",
+        status="started",
+        api_host=settings.api_host,
+        api_port=settings.api_port,
+        ollama_url=settings.ollama_url
+    )
     
     try:
         # Start the FastAPI server
@@ -41,15 +34,38 @@ async def main():
         )
         
         server = uvicorn.Server(config)
+        
+        ActionLogger.log_service_action(
+            logger,
+            action="fastapi_server_start",
+            status="started",
+            host=settings.api_host,
+            port=settings.api_port
+        )
+        
         await server.serve()
         
     except KeyboardInterrupt:
-        logger.info("Received shutdown signal")
+        ActionLogger.log_service_action(
+            logger,
+            action="ai_agent_shutdown",
+            status="completed",
+            reason="keyboard_interrupt"
+        )
     except Exception as e:
-        logger.error(f"Application error: {e}")
+        ActionLogger.log_service_action(
+            logger,
+            action="ai_agent_error",
+            status="failed",
+            error=str(e)
+        )
         sys.exit(1)
     finally:
-        logger.info("AI Agent stopped")
+        ActionLogger.log_service_action(
+            logger,
+            action="ai_agent_stopped",
+            status="completed"
+        )
 
 
 if __name__ == "__main__":

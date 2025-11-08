@@ -103,7 +103,10 @@ class ReportContent(BaseModel):
 class ReportConfiguration(BaseModel):
     """Report generation configuration"""
     enabled: bool = Field(default=True, description="Enable report generation")
-    levels: List[ReportLevel] = Field(default_factory=lambda: list(ReportLevel), description="Enabled report levels")
+    levels: List[ReportLevel] = Field(
+        default_factory=lambda: [ReportLevel.EXECUTIVE, ReportLevel.TECHNICAL], 
+        description="Enabled report levels"
+    )
     frequencies: Dict[ReportLevel, ReportFrequency] = Field(
         default_factory=lambda: {
             ReportLevel.REAL_TIME: ReportFrequency.REAL_TIME,

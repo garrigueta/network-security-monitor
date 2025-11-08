@@ -2,13 +2,16 @@
 
 import asyncio
 import json
+import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 import httpx
 import structlog
 
 from .config import settings
 from .attack_patterns import AttackPatternDetector
+from .logging_utils import ActionLogger
 
 logger = structlog.get_logger()
 
@@ -21,16 +24,38 @@ class DataCollector:
     
     async def get_honeypot_logs(self, hours: int = 24, limit: int = 100) -> List[Dict[str, Any]]:
         """Get honeypot logs from Loki or local filesystem"""
+        start_time = time.time()
         logs = []
+        
+        ActionLogger.log_data_collection(
+            logger,
+            source="honeypot",
+            action="get_logs",
+            status="started",
+            hours=hours,
+            limit=limit
+        )
         
         try:
             # Try reading from local filesystem first
             local_logs = await self.get_local_honeypot_logs(hours)
             if local_logs:
-                logger.info(f"Retrieved {len(local_logs)} honeypot logs from local filesystem")
+                ActionLogger.log_data_collection(
+                    logger,
+                    source="honeypot_filesystem",
+                    action="read_local_logs",
+                    status="completed",
+                    records_count=len(local_logs)
+                )
                 logs.extend(local_logs)
         except Exception as e:
-            logger.warning(f"Could not read local honeypot logs: {e}")
+            ActionLogger.log_data_collection(
+                logger,
+                source="honeypot_filesystem",
+                action="read_local_logs",
+                status="failed",
+                error=str(e)
+            )
         
         # Also try Loki as secondary source
         try:
@@ -76,16 +101,51 @@ class DataCollector:
                                 "raw": True
                             })
                 
-                logger.info(f"Retrieved {len(data['data']['result'])} additional honeypot log entries from Loki")
+                ActionLogger.log_data_collection(
+                    logger,
+                    source="loki",
+                    action="get_honeypot_logs",
+                    status="completed",
+                    records_count=len(data['data']['result'])
+                )
             
         except Exception as e:
-            logger.warning(f"Error fetching honeypot logs from Loki: {e}")
+            ActionLogger.log_data_collection(
+                logger,
+                source="loki",
+                action="get_honeypot_logs",
+                status="failed",
+                error=str(e)
+            )
         
-        logger.info(f"Total honeypot logs retrieved: {len(logs)}")
+        duration_ms = (time.time() - start_time) * 1000
+        final_count = min(len(logs), limit) if limit else len(logs)
+        
+        ActionLogger.log_data_collection(
+            logger,
+            source="honeypot",
+            action="get_logs",
+            status="completed",
+            records_count=final_count,
+            duration_ms=duration_ms,
+            hours=hours
+        )
+        
         return logs[:limit] if limit else logs
     
     async def get_prometheus_metrics(self, metric: str, duration: str = "1h") -> Dict[str, Any]:
         """Get metrics from Prometheus"""
+        start_time = time.time()
+        
+        ActionLogger.log_data_collection(
+            logger,
+            source="prometheus",
+            action="get_metrics",
+            status="started",
+            metric=metric,
+            duration=duration
+        )
+        
         try:
             # Map metric names to Prometheus queries
             metric_queries = {
@@ -105,19 +165,60 @@ class DataCollector:
             
             data = response.json()
             
+            duration_ms = (time.time() - start_time) * 1000
+            
             if data.get("status") == "success":
-                return data.get("data", {})
+                result_data = data.get("data", {})
+                result_count = len(result_data.get("result", []))
+                
+                ActionLogger.log_data_collection(
+                    logger,
+                    source="prometheus",
+                    action="get_metrics",
+                    status="completed",
+                    metric=metric,
+                    records_count=result_count,
+                    duration_ms=duration_ms
+                )
+                return result_data
             else:
-                logger.error(f"Prometheus query failed: {data}")
+                ActionLogger.log_data_collection(
+                    logger,
+                    source="prometheus",
+                    action="get_metrics",
+                    status="failed",
+                    metric=metric,
+                    error="Query failed",
+                    duration_ms=duration_ms
+                )
                 return {}
                 
         except Exception as e:
-            logger.error(f"Error fetching Prometheus metrics: {e}")
+            duration_ms = (time.time() - start_time) * 1000
+            ActionLogger.log_data_collection(
+                logger,
+                source="prometheus",
+                action="get_metrics",
+                status="failed",
+                metric=metric,
+                error=str(e),
+                duration_ms=duration_ms
+            )
             return {}
     
     async def get_security_alerts(self, severity: str = "all", source: str = "all") -> List[Dict[str, Any]]:
         """Get security alerts from various sources"""
+        start_time = time.time()
         alerts = []
+        
+        ActionLogger.log_data_collection(
+            logger,
+            source="security_alerts",
+            action="get_alerts",
+            status="started",
+            severity=severity,
+            alert_source=source
+        )
         
         try:
             # Get honeypot-based alerts
@@ -138,11 +239,31 @@ class DataCollector:
             # Sort by timestamp (most recent first)
             alerts.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
             
-            logger.info(f"Retrieved {len(alerts)} security alerts")
+            duration_ms = (time.time() - start_time) * 1000
+            
+            ActionLogger.log_data_collection(
+                logger,
+                source="security_alerts",
+                action="get_alerts",
+                status="completed",
+                records_count=len(alerts),
+                duration_ms=duration_ms,
+                severity=severity,
+                alert_source=source
+            )
+            
             return alerts
             
         except Exception as e:
-            logger.error(f"Error fetching security alerts: {e}")
+            duration_ms = (time.time() - start_time) * 1000
+            ActionLogger.log_data_collection(
+                logger,
+                source="security_alerts",
+                action="get_alerts",
+                status="failed",
+                error=str(e),
+                duration_ms=duration_ms
+            )
             return []
     
     async def _analyze_honeypot_alerts(self, severity: str) -> List[Dict[str, Any]]:

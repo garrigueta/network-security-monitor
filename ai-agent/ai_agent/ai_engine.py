@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 import httpx
@@ -11,6 +12,7 @@ from .config import settings
 from .data_sources import DataCollector
 from .mcp.server import mcp_server
 from .prompts import prompt_templates, PromptConfig
+from .logging_utils import ActionLogger
 
 logger = structlog.get_logger()
 
@@ -45,28 +47,77 @@ class AIEngine:
     
     async def initialize(self):
         """Initialize the AI engine"""
+        ActionLogger.log_service_action(
+            logger,
+            action="ai_engine_initialize",
+            status="started",
+            ollama_url=settings.ollama_url,
+            model=settings.ollama_model
+        )
+        
         try:
             # Test remote Ollama connection
             response = await self.http_client.get(f"{settings.ollama_url}/api/tags")
             if response.status_code == 200:
                 models = response.json()
                 available_models = [m['name'] for m in models.get('models', [])]
-                logger.info(f"Connected to remote Ollama at {settings.ollama_url}")
-                logger.info(f"Available models: {available_models}")
+                
+                ActionLogger.log_service_action(
+                    logger,
+                    action="ollama_connection_test",
+                    status="completed",
+                    ollama_url=settings.ollama_url,
+                    available_models=available_models,
+                    model_count=len(available_models)
+                )
                 
                 # Check if our configured model is available
                 if settings.ollama_model not in available_models:
-                    logger.warning(f"Configured model '{settings.ollama_model}' not found. Available: {available_models}")
-                    logger.info("Consider pulling the model: ollama pull llama3.1:8b")
+                    ActionLogger.log_service_action(
+                        logger,
+                        action="model_availability_check",
+                        status="failed",
+                        configured_model=settings.ollama_model,
+                        available_models=available_models,
+                        warning="Model not found"
+                    )
                 else:
-                    logger.info(f"Model '{settings.ollama_model}' is ready")
+                    ActionLogger.log_service_action(
+                        logger,
+                        action="model_availability_check",
+                        status="completed",
+                        model=settings.ollama_model
+                    )
             else:
-                logger.warning(f"Could not connect to remote Ollama at {settings.ollama_url} - AI features may be limited")
+                ActionLogger.log_service_action(
+                    logger,
+                    action="ollama_connection_test",
+                    status="failed",
+                    ollama_url=settings.ollama_url,
+                    status_code=response.status_code
+                )
         except Exception as e:
-            logger.warning(f"Remote Ollama connection failed: {e} - AI features may be limited")
+            ActionLogger.log_service_action(
+                logger,
+                action="ai_engine_initialize",
+                status="failed",
+                error=str(e),
+                ollama_url=settings.ollama_url
+            )
     
     async def analyze_honeypot(self, timeframe: str = "24h", focus_areas: Optional[List[str]] = None) -> Dict[str, Any]:
         """Analyze honeypot activity using AI with comprehensive log data"""
+        start_time = time.time()
+        
+        ActionLogger.log_ai_action(
+            logger,
+            action="honeypot_analysis",
+            model=settings.ollama_model,
+            status="started",
+            timeframe=timeframe,
+            focus_areas=focus_areas or ["general"]
+        )
+        
         try:
             # Get comprehensive logs from all sources
             hours = self._timeframe_to_hours(timeframe)
@@ -110,6 +161,19 @@ class AIEngine:
             # Get AI analysis
             ai_response = await self._query_ollama(prompt, analysis_type="honeypot")
             
+            duration_ms = (time.time() - start_time) * 1000
+            
+            ActionLogger.log_ai_action(
+                logger,
+                action="honeypot_analysis",
+                model=settings.ollama_model,
+                status="completed",
+                duration_ms=duration_ms,
+                timeframe=timeframe,
+                honeypot_events=honeypot_summary["total_honeypot_events"],
+                response_length=len(ai_response)
+            )
+            
             return {
                 "timestamp": datetime.now().isoformat(),
                 "timeframe": timeframe,
@@ -127,7 +191,15 @@ class AIEngine:
             }
             
         except Exception as e:
-            logger.error(f"Error in honeypot analysis: {e}")
+            duration_ms = (time.time() - start_time) * 1000
+            ActionLogger.log_ai_action(
+                logger,
+                action="honeypot_analysis",
+                model=settings.ollama_model,
+                status="failed",
+                duration_ms=duration_ms,
+                error=str(e)
+            )
             return {
                 "timestamp": datetime.now().isoformat(),
                 "error": str(e),
@@ -136,6 +208,17 @@ class AIEngine:
     
     async def analyze_network(self, timeframe: str = "24h", focus_areas: Optional[List[str]] = None) -> Dict[str, Any]:
         """Analyze network security and system metrics with comprehensive Zeek data"""
+        start_time = time.time()
+        
+        ActionLogger.log_ai_action(
+            logger,
+            action="network_analysis",
+            model=settings.ollama_model,
+            status="started",
+            timeframe=timeframe,
+            focus_areas=focus_areas or ["general"]
+        )
+        
         try:
             # Get comprehensive logs
             hours = self._timeframe_to_hours(timeframe)
@@ -178,6 +261,19 @@ class AIEngine:
             # Get AI analysis
             ai_response = await self._query_ollama(prompt, analysis_type="network")
             
+            duration_ms = (time.time() - start_time) * 1000
+            
+            ActionLogger.log_ai_action(
+                logger,
+                action="network_analysis",
+                model=settings.ollama_model,
+                status="completed",
+                duration_ms=duration_ms,
+                timeframe=timeframe,
+                total_connections=network_summary["total_connections"],
+                response_length=len(ai_response)
+            )
+            
             return {
                 "timestamp": datetime.now().isoformat(),
                 "timeframe": timeframe,
@@ -195,7 +291,15 @@ class AIEngine:
             }
             
         except Exception as e:
-            logger.error(f"Error in network analysis: {e}")
+            duration_ms = (time.time() - start_time) * 1000
+            ActionLogger.log_ai_action(
+                logger,
+                action="network_analysis",
+                model=settings.ollama_model,
+                status="failed",
+                duration_ms=duration_ms,
+                error=str(e)
+            )
             return {
                 "timestamp": datetime.now().isoformat(),
                 "error": str(e),
@@ -204,6 +308,17 @@ class AIEngine:
     
     async def process_query(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Process natural language queries about security data"""
+        start_time = time.time()
+        
+        ActionLogger.log_ai_action(
+            logger,
+            action="query_processing",
+            model=settings.ollama_model,
+            status="started",
+            query_length=len(query),
+            has_context=context is not None
+        )
+        
         try:
             # Determine what data to fetch based on query
             data_sources = self._determine_data_sources(query)
@@ -249,6 +364,20 @@ class AIEngine:
             # Get AI response with appropriate parameters
             ai_response = await self._query_ollama(prompt, analysis_type="query")
             
+            duration_ms = (time.time() - start_time) * 1000
+            
+            ActionLogger.log_ai_action(
+                logger,
+                action="query_processing",
+                model=settings.ollama_model,
+                status="completed",
+                duration_ms=duration_ms,
+                query_length=len(query),
+                response_length=len(ai_response),
+                data_sources=data_sources,
+                sources_used=sources_used
+            )
+            
             return {
                 "timestamp": datetime.now().isoformat(),
                 "response": ai_response,
@@ -261,7 +390,16 @@ class AIEngine:
             }
             
         except Exception as e:
-            logger.error(f"Error processing query: {e}")
+            duration_ms = (time.time() - start_time) * 1000
+            ActionLogger.log_ai_action(
+                logger,
+                action="query_processing",
+                model=settings.ollama_model,
+                status="failed",
+                duration_ms=duration_ms,
+                query_length=len(query),
+                error=str(e)
+            )
             return {
                 "timestamp": datetime.now().isoformat(),
                 "response": f"I encountered an error while processing your query: {str(e)}",
@@ -345,8 +483,17 @@ class AIEngine:
         
         for attempt in range(max_retries):
             try:
-                logger.info(f"Querying Ollama at {settings.ollama_url} with model {settings.ollama_model} (attempt {attempt + 1}/{max_retries})")
-                logger.debug(f"Prompt length: {len(full_prompt)} chars, max_tokens: {payload['options']['num_predict']}")
+                ActionLogger.log_ai_action(
+                    logger,
+                    action="ollama_query",
+                    model=settings.ollama_model,
+                    status="started",
+                    prompt_length=len(full_prompt),
+                    attempt=f"{attempt + 1}/{max_retries}",
+                    analysis_type=analysis_type,
+                    temperature=payload['options']['temperature'],
+                    max_tokens=payload['options']['num_predict']
+                )
                 
                 response = await self.http_client.post(
                     f"{settings.ollama_url}/api/generate",
@@ -357,18 +504,30 @@ class AIEngine:
                     result = response.json()
                     ai_response = result.get("response", "").strip()
                     
-                    # Debug log the result structure
-                    logger.debug(f"Ollama result keys: {list(result.keys())}")
-                    logger.debug(f"Done: {result.get('done')}, Context length: {len(result.get('context', []))}")
-                    
                     if ai_response:
-                        logger.info(f"Successfully received response from Ollama ({len(ai_response)} chars)")
+                        ActionLogger.log_ai_action(
+                            logger,
+                            action="ollama_query",
+                            model=settings.ollama_model,
+                            status="completed",
+                            response_length=len(ai_response),
+                            attempt=f"{attempt + 1}/{max_retries}",
+                            analysis_type=analysis_type,
+                            context_length=len(result.get('context', []))
+                        )
                         
                         # Validate response is not just whitespace or error message
                         if len(ai_response) < 50 and any(word in ai_response.lower() for word in ['error', 'failed', 'unavailable']):
-                            logger.warning(f"Received suspiciously short response: {ai_response}")
+                            ActionLogger.log_ai_action(
+                                logger,
+                                action="ollama_query",
+                                model=settings.ollama_model,
+                                status="failed",
+                                warning="Suspiciously short response",
+                                response=ai_response,
+                                attempt=f"{attempt + 1}/{max_retries}"
+                            )
                             if attempt < max_retries - 1:
-                                logger.info(f"Retrying in {retry_delay} seconds...")
                                 await asyncio.sleep(retry_delay)
                                 retry_delay *= 2
                                 continue

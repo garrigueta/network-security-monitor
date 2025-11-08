@@ -16,6 +16,7 @@ services:
       - ./.env:/app/.env:ro
       - /mnt/ssd-logs/zeek-logs:/mnt/zeek-logs:ro
       - /mnt/ssd-logs/honeypot-logs:/mnt/honeypot-logs:ro
+      - /mnt/ssd-logs/ai-agent:/mnt/ssd-logs/ai-agent:rw
     networks:
       - ai-agent
     restart: unless-stopped

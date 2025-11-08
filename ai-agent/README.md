@@ -48,6 +48,20 @@ Edit `.env` file:
 - `MONITORING_HOST` - Your monitoring stack IP (Grafana/Loki/Prometheus)
 - `API_PORT` - AI agent API port (default: 8080)
 
+### Logging Configuration
+
+The AI agent includes comprehensive logging for all service and AI actions stored on the SSD.
+
+Key logging settings:
+- `LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
+- `LOG_FORMAT` - Log format (json or console)
+- `LOG_TO_FILE` - Enable file logging (default: true)
+- `LOG_FILE` - Log file path (default: /mnt/ssd-logs/ai-agent/actions.log)
+- `LOG_ROTATION_SIZE` - Max file size before rotation (default: 10MB)
+- `LOG_RETENTION_COUNT` - Number of rotated files to keep (default: 10)
+
+Logs are stored on the SSD at `/mnt/ssd-logs/ai-agent/` alongside zeek and honeypot logs.
+
 ## Docker Deployment
 
 ```bash
