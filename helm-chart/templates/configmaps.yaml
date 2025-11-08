@@ -36,6 +36,24 @@ data:
         static_configs:
           - targets: ['node-exporter-honeypot:9100']
       {{- end }}
+      
+      # Kubernetes cAdvisor metrics for container monitoring
+      - job_name: 'kubernetes-cadvisor'
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
 {{- end }}
 ---
 {{- if .Values.monitoring.loki.enabled }}
@@ -161,6 +179,49 @@ data:
           - labels:
               source_ip:
               protocol:
+    {{- end }}
+    
+    {{- if .Values.aiAgent.enabled }}
+      - job_name: ai-agent-logs
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: ai-agent
+              application: ai-agent
+              __path__: /mnt/ssd-logs/ai-agent/*.log
+        pipeline_stages:
+          - json:
+              expressions:
+                timestamp: timestamp
+                level: level
+                event: event
+                logger: logger
+                action_type: action_type
+                status: status
+                source: source
+                duration_ms: duration_ms
+                error: error
+                records_count: records_count
+                metric: metric
+                endpoint: endpoint
+                method: method
+                status_code: status_code
+                report_type: report_type
+                model: model
+                prompt_length: prompt_length
+                response_length: response_length
+          - labels:
+              level:
+              event:
+              action_type:
+              status:
+              source:
+              endpoint:
+              model:
+          - timestamp:
+              source: timestamp
+              format: RFC3339
     {{- end }}
 {{- end }}
 ---

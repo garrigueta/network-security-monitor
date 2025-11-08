@@ -65,7 +65,7 @@ services:
       - monitoring
     restart: unless-stopped
 
-  # Promtail - Log collection for Zeek
+  # Promtail - Log collection for Zeek and AI Agent
   promtail:
     image: grafana/promtail:latest
     container_name: promtail
@@ -73,6 +73,7 @@ services:
     volumes:
       - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
       - /mnt/ssd-logs/zeek-logs:/mnt/zeek-logs:ro
+      - /mnt/ssd-logs/ai-agent:/mnt/ssd-logs/ai-agent:ro
       - /mnt/ssd-logs/promtail-positions:/var/lib/promtail
     networks:
       - monitoring

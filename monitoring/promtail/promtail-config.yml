@@ -57,3 +57,47 @@ scrape_configs:
         labels:
           job: zeek
           __path__: /mnt/zeek-logs/logs/current/*.log
+
+  # AI Agent structured logs
+  - job_name: ai_agent
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: ai-agent
+          application: ai-agent
+          log_type: structured
+          __path__: /mnt/ssd-logs/ai-agent/actions.log
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            event: event
+            level: level
+            status: status
+            duration_ms: duration_ms
+            source: source
+            endpoint: endpoint
+            model: model
+            operation: operation
+            records_count: records_count
+            severity: severity
+            pattern_name: pattern_name
+            source_ip: source_ip
+            confidence: confidence
+            status_code: status_code
+            error: error
+      - labels:
+          event:
+          level:
+          status:
+          source:
+          endpoint:
+          model:
+          severity:
+          pattern_name:
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      - output:
+          source: message

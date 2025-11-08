@@ -24,7 +24,7 @@ class DataCollector:
     
     async def get_honeypot_logs(self, hours: int = 24, limit: int = 100) -> List[Dict[str, Any]]:
         """Get honeypot logs from Loki or local filesystem"""
-        start_time = time.time()
+        operation_start = time.time()
         logs = []
         
         ActionLogger.log_data_collection(
@@ -118,7 +118,7 @@ class DataCollector:
                 error=str(e)
             )
         
-        duration_ms = (time.time() - start_time) * 1000
+        duration_ms = (time.time() - operation_start) * 1000
         final_count = min(len(logs), limit) if limit else len(logs)
         
         ActionLogger.log_data_collection(
