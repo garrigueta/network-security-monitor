@@ -230,6 +230,9 @@ aiAgent:
     ollamaHost: "192.168.1.132"
     ollamaModel: "qwen3:30b"
     logLevel: "INFO"
+    logFormat: "json"
+    logRotationSize: "10MB"
+    logRetentionCount: "10"
 
 # Test Simulator configuration
 testSimulator:

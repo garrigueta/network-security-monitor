@@ -191,3 +191,38 @@ spec:
       storage: {{ .Values.honeypot.storage.size }}
   storageClassName: local-storage
 {{- end }}
+
+{{- if .Values.aiAgent.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ai-agent-logs-pv
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  hostPath:
+    path: /mnt/ssd-logs/ai-agent
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ai-agent-logs
+  namespace: {{ include "network-security-monitor.namespace" . }}
+  labels:
+    {{- include "network-security-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ai-agent
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-storage
+{{- end }}
