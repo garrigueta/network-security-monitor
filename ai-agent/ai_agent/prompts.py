@@ -194,6 +194,61 @@ Focus on evidence-based findings and provide confidence ratings."""
             data_sources=", ".join(data_sources),
             time_range=time_range
         )
+    
+    KUBERNETES_CLUSTER_HEALTH = """Analyze the Kubernetes cluster health and operational status:
+
+📊 CLUSTER METRICS:
+{kubernetes_metrics}
+
+🚨 ERROR ANALYSIS:
+{error_summary}
+
+📈 RESOURCE TRENDS:
+{resource_trends}
+
+📋 COMPREHENSIVE CLUSTER HEALTH REQUIREMENTS:
+1. **Executive Summary** - Overall cluster health status and critical issues
+2. **Error Analysis** - OOM events, memory failures, network errors with root causes
+3. **Resource Utilization** - CPU, memory, network usage patterns by namespace/pod
+4. **Performance Trends** - Resource usage trends over time period
+5. **Capacity Assessment** - Current capacity vs usage, growth projections
+6. **Pod Health Status** - Pod phases, restart patterns, stability analysis
+7. **Network Health** - Network errors, throughput, connectivity issues
+8. **Critical Findings** - High-priority operational concerns requiring immediate attention
+9. **Operational Recommendations** - Immediate actions to resolve issues
+10. **Strategic Planning** - Long-term cluster optimization and scaling recommendations
+
+🎯 TIMEFRAME: {timeframe}
+📍 FOCUS AREAS: {focus_areas}
+
+IMPORTANT ANALYSIS REQUIREMENTS:
+- **Root Cause Analysis**: For each error type, explain the likely cause (e.g., resource limits, networking issues, configuration problems)
+- **Impact Assessment**: Quantify the impact of errors on cluster operations
+- **Trend Detection**: Identify if errors are increasing, decreasing, or stable
+- **Resource Bottlenecks**: Highlight containers/pods approaching resource limits
+- **Namespace Analysis**: Compare health across different namespaces
+- **Actionable Guidance**: Provide specific commands, configuration changes, or interventions
+
+SEVERITY CLASSIFICATION:
+- 🔴 CRITICAL: Cluster instability, widespread OOM events, multiple pod failures
+- 🟠 HIGH: Frequent errors, resource pressure, individual pod issues
+- 🟡 MEDIUM: Minor errors, suboptimal resource usage, potential future issues
+- 🟢 LOW: Healthy operations with room for optimization
+
+Provide clear, actionable insights with specific evidence from the metrics data."""
+    
+    @classmethod
+    def get_kubernetes_health_prompt(cls, kubernetes_metrics: str, error_summary: str,
+                                    resource_trends: str, focus_areas: list,
+                                    timeframe: str) -> str:
+        """Get formatted Kubernetes cluster health analysis prompt"""
+        return cls.KUBERNETES_CLUSTER_HEALTH.format(
+            kubernetes_metrics=kubernetes_metrics,
+            error_summary=error_summary,
+            resource_trends=resource_trends,
+            focus_areas=", ".join(focus_areas) if focus_areas else "comprehensive cluster health",
+            timeframe=timeframe
+        )
 
 
 class PromptConfig:
@@ -224,6 +279,12 @@ class PromptConfig:
             "top_p": 0.7,
             "max_tokens": 4000,
             "stop": ["END_HUNT"]
+        },
+        "kubernetes": {
+            "temperature": 0.3,  # Focused for operational analysis
+            "top_p": 0.8,
+            "max_tokens": 3500,
+            "stop": ["END_CLUSTER_ANALYSIS"]
         }
     }
     

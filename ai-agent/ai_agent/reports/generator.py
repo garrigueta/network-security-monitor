@@ -12,6 +12,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from ..ai_engine import AIEngine
 from ..data_sources import DataCollector
+from ..config import settings
 from .models import (
     ReportLevel, ReportFrequency, ReportStatus, ReportContent, ReportMetadata,
     ExecutiveSummary, TechnicalAnalysis, DetailedForensics, RealTimeAlert,
@@ -27,8 +28,8 @@ class ReportGenerator:
     def __init__(self, ai_engine: AIEngine, data_sources: DataCollector):
         self.ai_engine = ai_engine
         self.data_sources = data_sources
-        self.reports_dir = Path("reports")
-        self.reports_dir.mkdir(exist_ok=True)
+        self.reports_dir = Path(settings.reports_dir)
+        self.reports_dir.mkdir(parents=True, exist_ok=True)
         
         # Setup Jinja2 for HTML templates
         self.template_env = Environment(
@@ -125,8 +126,17 @@ class ReportGenerator:
         )
         
         try:
-            # Generate report content based on level
-            if level == ReportLevel.EXECUTIVE:
+            # Check if this is a Kubernetes-specific report
+            is_kubernetes_report = focus_areas and any(
+                area.lower() in ["kubernetes", "k8s", "cluster", "cluster_health", "pod_health"]
+                for area in focus_areas
+            )
+            
+            # Generate report content based on level and focus
+            if is_kubernetes_report:
+                # Generate Kubernetes-specific report
+                content = await self._generate_kubernetes_report(metadata, focus_areas)
+            elif level == ReportLevel.EXECUTIVE:
                 content = await self._generate_executive_report(metadata, focus_areas)
             elif level == ReportLevel.TECHNICAL:
                 content = await self._generate_technical_report(metadata, focus_areas)
@@ -151,6 +161,93 @@ class ReportGenerator:
             logger.error(f"Failed to generate report: {e}")
             metadata.status = ReportStatus.FAILED
             raise
+    
+    async def _generate_kubernetes_report(self, metadata: ReportMetadata,
+                                          focus_areas: Optional[List[str]]) -> ReportContent:
+        """Generate Kubernetes cluster health report"""
+        
+        # Get Kubernetes metrics
+        hours = int((metadata.period_end - metadata.period_start).total_seconds() / 3600)
+        
+        # Use AI engine to analyze Kubernetes cluster
+        timeframe_map = {1: "1h", 6: "6h", 24: "24h", 168: "7d"}
+        timeframe = timeframe_map.get(hours, "24h")
+        
+        kubernetes_analysis = await self.ai_engine.analyze_kubernetes_cluster(
+            timeframe=timeframe,
+            focus_areas=focus_areas
+        )
+        
+        ai_analysis = kubernetes_analysis.get("ai_analysis", "Analysis not available")
+        cluster_metrics = kubernetes_analysis.get("cluster_metrics", {})
+        
+        # Create executive summary from Kubernetes analysis
+        error_totals = cluster_metrics.get("errors", {})
+        total_errors = sum(error_totals.values())
+        
+        # Determine threat level based on errors
+        if total_errors > 100:
+            threat_level = "CRITICAL"
+            security_score = 40
+        elif total_errors > 50:
+            threat_level = "HIGH"
+            security_score = 60
+        elif total_errors > 10:
+            threat_level = "MEDIUM"
+            security_score = 75
+        else:
+            threat_level = "LOW"
+            security_score = 90
+        
+        # Extract key findings
+        key_findings = [
+            f"Total cluster errors in {hours}h period: {total_errors}",
+            f"OOM events: {error_totals.get('oom_events', 0)}",
+            f"Memory failures: {error_totals.get('memory_failures', 0)}",
+            f"Network errors: {error_totals.get('network_rx_errors', 0) + error_totals.get('network_tx_errors', 0)}"
+        ]
+        
+        # Extract recommendations (look for action items in AI analysis)
+        recommendations = []
+        if "recommendation" in ai_analysis.lower():
+            # Try to parse recommendations from AI output
+            lines = ai_analysis.split('\n')
+            in_rec_section = False
+            for line in lines:
+                if 'recommendation' in line.lower():
+                    in_rec_section = True
+                elif in_rec_section and line.strip().startswith('-'):
+                    recommendations.append(line.strip('- ').strip())
+                elif in_rec_section and not line.strip():
+                    break
+        
+        if not recommendations:
+            recommendations = [
+                "Monitor resource usage trends to identify capacity issues",
+                "Investigate pods with high error rates",
+                "Review and optimize resource limits and requests"
+            ]
+        
+        executive_summary = ExecutiveSummary(
+            security_score=security_score,
+            threat_level=threat_level,
+            key_findings=key_findings,
+            recommendations=recommendations,
+            metrics_summary={
+                "total_errors": total_errors,
+                "oom_events": error_totals.get('oom_events', 0),
+                "memory_failures": error_totals.get('memory_failures', 0),
+                "network_errors": error_totals.get('network_rx_errors', 0) + error_totals.get('network_tx_errors', 0),
+                "report_type": "kubernetes_cluster_health"
+            },
+            trend_analysis=f"Cluster health analyzed over {hours}h period"
+        )
+        
+        return ReportContent(
+            metadata=metadata,
+            executive_summary=executive_summary,
+            ai_analysis=ai_analysis
+        )
     
     async def _generate_executive_report(self, metadata: ReportMetadata,
                                        focus_areas: Optional[List[str]]) -> ReportContent:

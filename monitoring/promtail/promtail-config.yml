@@ -17,7 +17,7 @@ scrape_configs:
         labels:
           job: zeek
           log_type: conn
-          __path__: /mnt/zeek-logs/logs/current/conn.log
+          __path__: /mnt/ssd-logs/zeek/logs/current/conn.log
 
   # Zeek DNS logs
   - job_name: zeek_dns
@@ -27,7 +27,7 @@ scrape_configs:
         labels:
           job: zeek
           log_type: dns
-          __path__: /mnt/zeek-logs/logs/current/dns.log
+          __path__: /mnt/ssd-logs/zeek/logs/current/dns.log
 
   # Zeek HTTP logs
   - job_name: zeek_http
@@ -37,7 +37,7 @@ scrape_configs:
         labels:
           job: zeek
           log_type: http
-          __path__: /mnt/zeek-logs/logs/current/http.log
+          __path__: /mnt/ssd-logs/zeek/logs/current/http.log
 
   # Zeek SSL logs
   - job_name: zeek_ssl
@@ -47,7 +47,7 @@ scrape_configs:
         labels:
           job: zeek
           log_type: ssl
-          __path__: /mnt/zeek-logs/logs/current/ssl.log
+          __path__: /mnt/ssd-logs/zeek/logs/current/ssl.log
 
   # All Zeek logs (fallback)
   - job_name: zeek_all
@@ -56,7 +56,7 @@ scrape_configs:
           - localhost
         labels:
           job: zeek
-          __path__: /mnt/zeek-logs/logs/current/*.log
+          __path__: /mnt/ssd-logs/zeek/logs/current/*.log
 
   # AI Agent structured logs
   - job_name: ai_agent

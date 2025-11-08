@@ -25,6 +25,7 @@ metadata:
   name: prometheus-data-pv
   labels:
     {{- include "network-security-monitor.labels" . | nindent 4 }}
+    volume-name: prometheus-data-pv
 spec:
   capacity:
     storage: {{ .Values.monitoring.prometheus.storage.size }}
@@ -33,7 +34,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: local-storage
   hostPath:
-    path: /mnt/ssd-logs/prometheus-data
+    path: /mnt/ssd-logs/prometheus
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -50,6 +51,9 @@ spec:
     requests:
       storage: {{ .Values.monitoring.prometheus.storage.size }}
   storageClassName: local-storage
+  selector:
+    matchLabels:
+      volume-name: prometheus-data-pv
 {{- end }}
 
 {{- if .Values.monitoring.loki.enabled }}
@@ -60,6 +64,7 @@ metadata:
   name: loki-data-pv
   labels:
     {{- include "network-security-monitor.labels" . | nindent 4 }}
+    volume-name: loki-data-pv
 spec:
   capacity:
     storage: {{ .Values.monitoring.loki.storage.size }}
@@ -68,7 +73,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: local-storage
   hostPath:
-    path: /mnt/ssd-logs/loki-data
+    path: /mnt/ssd-logs/loki
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -85,6 +90,9 @@ spec:
     requests:
       storage: {{ .Values.monitoring.loki.storage.size }}
   storageClassName: local-storage
+  selector:
+    matchLabels:
+      volume-name: loki-data-pv
 {{- end }}
 
 {{- if .Values.monitoring.grafana.enabled }}
@@ -95,6 +103,7 @@ metadata:
   name: grafana-data-pv
   labels:
     {{- include "network-security-monitor.labels" . | nindent 4 }}
+    volume-name: grafana-data-pv
 spec:
   capacity:
     storage: {{ .Values.monitoring.grafana.storage.size }}
@@ -120,6 +129,9 @@ spec:
     requests:
       storage: {{ .Values.monitoring.grafana.storage.size }}
   storageClassName: local-storage
+  selector:
+    matchLabels:
+      volume-name: grafana-data-pv
 {{- end }}
 
 {{- if .Values.zeek.enabled }}
@@ -130,6 +142,7 @@ metadata:
   name: zeek-logs-pv
   labels:
     {{- include "network-security-monitor.labels" . | nindent 4 }}
+    volume-name: zeek-logs-pv
 spec:
   capacity:
     storage: {{ .Values.zeek.storage.size }}
@@ -138,7 +151,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: local-storage
   hostPath:
-    path: /mnt/ssd-logs/zeek-logs
+    path: /mnt/ssd-logs/zeek
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -155,6 +168,9 @@ spec:
     requests:
       storage: {{ .Values.zeek.storage.size }}
   storageClassName: local-storage
+  selector:
+    matchLabels:
+      volume-name: zeek-logs-pv
 {{- end }}
 
 {{- if .Values.honeypot.enabled }}
@@ -165,6 +181,7 @@ metadata:
   name: honeypot-logs-pv
   labels:
     {{- include "network-security-monitor.labels" . | nindent 4 }}
+    volume-name: honeypot-logs-pv
 spec:
   capacity:
     storage: {{ .Values.honeypot.storage.size }}
@@ -173,7 +190,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: local-storage
   hostPath:
-    path: /mnt/ssd-logs/honeypot-logs
+    path: /mnt/ssd-logs/honeypot
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -190,6 +207,9 @@ spec:
     requests:
       storage: {{ .Values.honeypot.storage.size }}
   storageClassName: local-storage
+  selector:
+    matchLabels:
+      volume-name: honeypot-logs-pv
 {{- end }}
 
 {{- if .Values.aiAgent.enabled }}
@@ -200,6 +220,7 @@ metadata:
   name: ai-agent-logs-pv
   labels:
     {{- include "network-security-monitor.labels" . | nindent 4 }}
+    volume-name: ai-agent-logs-pv
 spec:
   capacity:
     storage: 5Gi
@@ -225,4 +246,7 @@ spec:
     requests:
       storage: 5Gi
   storageClassName: local-storage
+  selector:
+    matchLabels:
+      volume-name: ai-agent-logs-pv
 {{- end }}

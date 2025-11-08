@@ -181,10 +181,10 @@ spec:
         - name: config
           mountPath: /etc/promtail
         - name: zeek-logs
-          mountPath: /mnt/zeek-logs
+          mountPath: /mnt/ssd-logs/zeek
           readOnly: true
         - name: honeypot-logs
-          mountPath: /mnt/honeypot-logs
+          mountPath: /mnt/ssd-logs/honeypot
           readOnly: true
         - name: ai-agent-logs
           mountPath: /mnt/ssd-logs/ai-agent

@@ -206,6 +206,118 @@ class DataCollector:
             )
             return {}
     
+    async def get_kubernetes_metrics(self, hours: int = 24) -> Dict[str, Any]:
+        """Get Kubernetes cluster health metrics from Prometheus"""
+        start_time = time.time()
+        
+        ActionLogger.log_data_collection(
+            logger,
+            source="prometheus",
+            action="get_kubernetes_metrics",
+            status="started",
+            hours=hours
+        )
+        
+        metrics = {
+            "errors": {},
+            "resource_usage": {},
+            "pod_status": {},
+            "collection_time": datetime.now().isoformat()
+        }
+        
+        try:
+            # Container error metrics
+            error_queries = {
+                "oom_events": f'sum by (namespace, pod) (increase(container_oom_events_total[{hours}h]))',
+                "memory_failures": f'sum by (namespace, pod, type) (increase(container_memory_failures_total[{hours}h]))',
+                "network_rx_errors": f'sum by (namespace, pod) (increase(container_network_receive_errors_total[{hours}h]))',
+                "network_tx_errors": f'sum by (namespace, pod) (increase(container_network_transmit_errors_total[{hours}h]))',
+                "scrape_errors": 'count by (namespace, pod) (container_scrape_error > 0)'
+            }
+            
+            # Resource usage metrics
+            resource_queries = {
+                "cpu_usage": 'sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{container!=""}[5m]))',
+                "memory_usage": 'sum by (namespace, pod) (container_memory_working_set_bytes{container!=""})',
+                "memory_available": 'sum by (namespace, pod) (container_memory_available_bytes{container!=""})',
+                "network_rx_bytes": 'sum by (namespace, pod) (rate(container_network_receive_bytes_total[5m]))',
+                "network_tx_bytes": 'sum by (namespace, pod) (rate(container_network_transmit_bytes_total[5m]))',
+            }
+            
+            # Pod status metrics
+            status_queries = {
+                "pod_restarts": 'sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total[24h]))',
+                "pod_phase": 'count by (phase) (kube_pod_status_phase)',
+            }
+            
+            # Execute error queries
+            for metric_name, query in error_queries.items():
+                try:
+                    result = await self._execute_prom_query(query)
+                    metrics["errors"][metric_name] = result
+                except Exception as e:
+                    logger.warning(f"Failed to query {metric_name}: {e}")
+                    metrics["errors"][metric_name] = {"result": [], "error": str(e)}
+            
+            # Execute resource queries
+            for metric_name, query in resource_queries.items():
+                try:
+                    result = await self._execute_prom_query(query)
+                    metrics["resource_usage"][metric_name] = result
+                except Exception as e:
+                    logger.warning(f"Failed to query {metric_name}: {e}")
+                    metrics["resource_usage"][metric_name] = {"result": [], "error": str(e)}
+            
+            # Execute status queries (optional - may not have kube-state-metrics)
+            for metric_name, query in status_queries.items():
+                try:
+                    result = await self._execute_prom_query(query)
+                    metrics["pod_status"][metric_name] = result
+                except Exception as e:
+                    logger.debug(f"Status metric {metric_name} not available: {e}")
+                    metrics["pod_status"][metric_name] = {"result": [], "error": str(e)}
+            
+            duration_ms = (time.time() - start_time) * 1000
+            
+            ActionLogger.log_data_collection(
+                logger,
+                source="prometheus",
+                action="get_kubernetes_metrics",
+                status="completed",
+                hours=hours,
+                duration_ms=duration_ms,
+                metrics_collected=len(error_queries) + len(resource_queries) + len(status_queries)
+            )
+            
+            return metrics
+            
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            ActionLogger.log_data_collection(
+                logger,
+                source="prometheus",
+                action="get_kubernetes_metrics",
+                status="failed",
+                error=str(e),
+                duration_ms=duration_ms
+            )
+            return metrics
+    
+    async def _execute_prom_query(self, query: str) -> Dict[str, Any]:
+        """Execute a Prometheus query and return results"""
+        url = f"{settings.prometheus_url}/api/v1/query"
+        params = {"query": query}
+        
+        response = await self.http_client.get(url, params=params)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        if data.get("status") == "success":
+            return data.get("data", {})
+        else:
+            raise Exception(f"Query failed: {data.get('error', 'Unknown error')}")
+    
     async def get_security_alerts(self, severity: str = "all", source: str = "all") -> List[Dict[str, Any]]:
         """Get security alerts from various sources"""
         start_time = time.time()
@@ -564,7 +676,7 @@ class DataCollector:
             if log_types is None:
                 log_types = ["conn", "dns", "http", "ssl", "ssh"]
             
-            zeek_base = Path("/mnt/zeek-logs/logs/current")
+            zeek_base = Path("/mnt/ssd-logs/zeek/logs/current")
             
             for log_type in log_types:
                 log_file = zeek_base / f"{log_type}.log"
@@ -823,7 +935,7 @@ class DataCollector:
                 "snmp"       # SNMP
             ]
             
-            zeek_base = Path("/mnt/zeek-logs/logs/current")
+            zeek_base = Path("/mnt/ssd-logs/zeek/logs/current")
             
             for log_type in log_types:
                 log_file = zeek_base / f"{log_type}.log"
@@ -1023,7 +1135,7 @@ class DataCollector:
                     ]
             
             # Zeek log paths
-            zeek_base = Path("/mnt/zeek-logs/logs")
+            zeek_base = Path("/mnt/ssd-logs/zeek/logs")
             if zeek_base.exists():
                 file_paths["zeek"] = [
                     str(f.relative_to(zeek_base)) for f in zeek_base.rglob("*.log*")

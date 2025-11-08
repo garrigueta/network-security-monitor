@@ -306,6 +306,155 @@ class AIEngine:
                 "ai_analysis": "Analysis unavailable due to error"
             }
     
+    async def analyze_kubernetes_cluster(self, timeframe: str = "24h", focus_areas: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Analyze Kubernetes cluster health and operational status"""
+        start_time = time.time()
+        
+        ActionLogger.log_ai_action(
+            logger,
+            action="kubernetes_analysis",
+            model=settings.ollama_model,
+            status="started",
+            timeframe=timeframe,
+            focus_areas=focus_areas or ["cluster_health"]
+        )
+        
+        try:
+            # Get Kubernetes metrics from Prometheus
+            hours = self._timeframe_to_hours(timeframe)
+            k8s_metrics = await self.data_collector.get_kubernetes_metrics(hours=hours)
+            
+            # Process and summarize error metrics
+            error_summary = {
+                "oom_events": self._count_metric_values(k8s_metrics["errors"].get("oom_events", {})),
+                "memory_failures": self._count_metric_values(k8s_metrics["errors"].get("memory_failures", {})),
+                "network_rx_errors": self._count_metric_values(k8s_metrics["errors"].get("network_rx_errors", {})),
+                "network_tx_errors": self._count_metric_values(k8s_metrics["errors"].get("network_tx_errors", {})),
+                "scrape_errors": self._count_metric_values(k8s_metrics["errors"].get("scrape_errors", {}))
+            }
+            
+            # Process resource usage metrics
+            resource_summary = {
+                "cpu_usage_by_namespace": self._aggregate_by_namespace(k8s_metrics["resource_usage"].get("cpu_usage", {})),
+                "memory_usage_by_namespace": self._aggregate_by_namespace(k8s_metrics["resource_usage"].get("memory_usage", {})),
+                "top_cpu_pods": self._get_top_pods(k8s_metrics["resource_usage"].get("cpu_usage", {}), limit=10),
+                "top_memory_pods": self._get_top_pods(k8s_metrics["resource_usage"].get("memory_usage", {}), limit=10),
+                "network_throughput": {
+                    "rx_bytes_per_sec": self._count_metric_values(k8s_metrics["resource_usage"].get("network_rx_bytes", {})),
+                    "tx_bytes_per_sec": self._count_metric_values(k8s_metrics["resource_usage"].get("network_tx_bytes", {}))
+                }
+            }
+            
+            # Create comprehensive analysis prompt
+            prompt = prompt_templates.get_kubernetes_health_prompt(
+                kubernetes_metrics=json.dumps(k8s_metrics, indent=2),
+                error_summary=json.dumps(error_summary, indent=2),
+                resource_trends=json.dumps(resource_summary, indent=2),
+                focus_areas=focus_areas or ["cluster_health", "error_analysis", "capacity_planning"],
+                timeframe=timeframe
+            )
+            
+            # Get AI analysis
+            ai_response = await self._query_ollama(prompt, analysis_type="kubernetes")
+            
+            duration_ms = (time.time() - start_time) * 1000
+            
+            ActionLogger.log_ai_action(
+                logger,
+                action="kubernetes_analysis",
+                model=settings.ollama_model,
+                status="completed",
+                duration_ms=duration_ms,
+                timeframe=timeframe,
+                total_errors=sum(error_summary.values()),
+                response_length=len(ai_response)
+            )
+            
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "timeframe": timeframe,
+                "ai_analysis": ai_response,
+                "cluster_metrics": {
+                    "errors": error_summary,
+                    "resources": resource_summary,
+                    "collection_time": k8s_metrics.get("collection_time")
+                },
+                "raw_data": k8s_metrics,
+                "focus_areas": focus_areas or ["cluster_health"]
+            }
+            
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            ActionLogger.log_ai_action(
+                logger,
+                action="kubernetes_analysis",
+                model=settings.ollama_model,
+                status="failed",
+                duration_ms=duration_ms,
+                error=str(e)
+            )
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "error": str(e),
+                "ai_analysis": "Kubernetes analysis unavailable due to error"
+            }
+    
+    def _count_metric_values(self, metric_data: Dict[str, Any]) -> int:
+        """Count total values from Prometheus metric results"""
+        if not metric_data or "result" not in metric_data:
+            return 0
+        
+        total = 0
+        for result in metric_data["result"]:
+            if "value" in result and len(result["value"]) > 1:
+                try:
+                    total += float(result["value"][1])
+                except (ValueError, TypeError):
+                    pass
+        return int(total)
+    
+    def _aggregate_by_namespace(self, metric_data: Dict[str, Any]) -> Dict[str, float]:
+        """Aggregate metric values by namespace"""
+        if not metric_data or "result" not in metric_data:
+            return {}
+        
+        namespace_totals = {}
+        for result in metric_data["result"]:
+            namespace = result.get("metric", {}).get("namespace", "unknown")
+            if "value" in result and len(result["value"]) > 1:
+                try:
+                    value = float(result["value"][1])
+                    namespace_totals[namespace] = namespace_totals.get(namespace, 0) + value
+                except (ValueError, TypeError):
+                    pass
+        return namespace_totals
+    
+    def _get_top_pods(self, metric_data: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
+        """Get top N pods by metric value"""
+        if not metric_data or "result" not in metric_data:
+            return []
+        
+        pod_values = []
+        for result in metric_data["result"]:
+            metric = result.get("metric", {})
+            namespace = metric.get("namespace", "unknown")
+            pod = metric.get("pod", "unknown")
+            
+            if "value" in result and len(result["value"]) > 1:
+                try:
+                    value = float(result["value"][1])
+                    pod_values.append({
+                        "namespace": namespace,
+                        "pod": pod,
+                        "value": value
+                    })
+                except (ValueError, TypeError):
+                    pass
+        
+        # Sort by value descending and return top N
+        pod_values.sort(key=lambda x: x["value"], reverse=True)
+        return pod_values[:limit]
+    
     async def process_query(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Process natural language queries about security data"""
         start_time = time.time()

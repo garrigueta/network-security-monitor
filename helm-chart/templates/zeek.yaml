@@ -25,10 +25,10 @@ spec:
       initContainers:
       - name: fix-permissions
         image: busybox
-        command: ['sh', '-c', 'chown -R 1000:1000 /mnt/zeek-logs && chmod -R 755 /mnt/zeek-logs']
+        command: ['sh', '-c', 'chown -R 1000:1000 /mnt/ssd-logs/zeek && chmod -R 755 /mnt/ssd-logs/zeek']
         volumeMounts:
         - name: logs
-          mountPath: /mnt/zeek-logs
+          mountPath: /mnt/ssd-logs/zeek
       containers:
       - name: zeek
         image: "{{ .Values.global.imageRegistry }}{{ .Values.zeek.image.repository }}:{{ .Values.zeek.image.tag }}"
@@ -43,7 +43,7 @@ spec:
             - NET_RAW
         volumeMounts:
         - name: logs
-          mountPath: /mnt/zeek-logs
+          mountPath: /mnt/ssd-logs/zeek
         - name: config
           mountPath: /usr/local/zeek/share/zeek/site/local.zeek
           subPath: local.zeek

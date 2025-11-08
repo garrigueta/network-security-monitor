@@ -139,7 +139,7 @@ data:
               - localhost
             labels:
               job: zeek
-              __path__: /mnt/zeek-logs/spool/zeek/*.log
+              __path__: /mnt/ssd-logs/zeek/logs/current/*.log
         pipeline_stages:
           - json:
               expressions:
@@ -159,7 +159,7 @@ data:
               - localhost
             labels:
               job: cowrie
-              __path__: /mnt/honeypot-logs/cowrie/*.log
+              __path__: /mnt/ssd-logs/honeypot/cowrie/*.log
       
       - job_name: heralding-logs
         static_configs:
@@ -168,7 +168,7 @@ data:
             labels:
               job: honeypot
               honeypot_type: heralding
-              __path__: /mnt/honeypot-logs/heralding/*.json
+              __path__: /mnt/ssd-logs/honeypot/heralding/*.json
         pipeline_stages:
           - json:
               expressions:
@@ -189,7 +189,7 @@ data:
             labels:
               job: ai-agent
               application: ai-agent
-              __path__: /mnt/ssd-logs/ai-agent/*.log
+              __path__: /mnt/ssd-logs/ai-agent/logs/*.log
         pipeline_stages:
           - json:
               expressions:

@@ -182,6 +182,22 @@ class ReportScheduler:
             }
         return jobs
     
+    async def _generate_kubernetes_health_report(self):
+        """Generate scheduled Kubernetes cluster health report"""
+        try:
+            logger.info("Generating scheduled Kubernetes cluster health report")
+            
+            report = await self.report_generator.generate_report(
+                level=ReportLevel.EXECUTIVE,
+                period_hours=24,
+                focus_areas=["kubernetes", "cluster_health", "error_analysis"]
+            )
+            
+            logger.info(f"Successfully generated Kubernetes health report: {report.metadata.id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to generate Kubernetes health report: {e}")
+    
     async def trigger_manual_report(self, level: ReportLevel, period_hours: int = 24) -> str:
         """Manually trigger report generation"""
         logger.info(f"Manually triggering {level.value} report")
