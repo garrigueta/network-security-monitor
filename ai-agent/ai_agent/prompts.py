@@ -203,7 +203,10 @@ Focus on evidence-based findings and provide confidence ratings."""
 🚨 ERROR ANALYSIS:
 {error_summary}
 
-📈 RESOURCE TRENDS:
+� ERROR LOGS (Recent Pod/Container Errors):
+{error_logs}
+
+�📈 RESOURCE TRENDS:
 {resource_trends}
 
 📋 COMPREHENSIVE CLUSTER HEALTH REQUIREMENTS:
@@ -222,12 +225,14 @@ Focus on evidence-based findings and provide confidence ratings."""
 📍 FOCUS AREAS: {focus_areas}
 
 IMPORTANT ANALYSIS REQUIREMENTS:
+- **Error Log Analysis**: Review actual error messages from pods/containers to identify specific issues (crashes, OOM kills, failed startups)
 - **Root Cause Analysis**: For each error type, explain the likely cause (e.g., resource limits, networking issues, configuration problems)
+- **Container/Pod Failures**: Identify specific containers or pods experiencing errors, restarts, or crashes
 - **Impact Assessment**: Quantify the impact of errors on cluster operations
 - **Trend Detection**: Identify if errors are increasing, decreasing, or stable
 - **Resource Bottlenecks**: Highlight containers/pods approaching resource limits
 - **Namespace Analysis**: Compare health across different namespaces
-- **Actionable Guidance**: Provide specific commands, configuration changes, or interventions
+- **Actionable Guidance**: Provide specific commands, configuration changes, or interventions based on actual error messages
 
 SEVERITY CLASSIFICATION:
 - 🔴 CRITICAL: Cluster instability, widespread OOM events, multiple pod failures
@@ -239,12 +244,13 @@ Provide clear, actionable insights with specific evidence from the metrics data.
     
     @classmethod
     def get_kubernetes_health_prompt(cls, kubernetes_metrics: str, error_summary: str,
-                                    resource_trends: str, focus_areas: list,
-                                    timeframe: str) -> str:
+                                    resource_trends: str, error_logs: str,
+                                    focus_areas: list, timeframe: str) -> str:
         """Get formatted Kubernetes cluster health analysis prompt"""
         return cls.KUBERNETES_CLUSTER_HEALTH.format(
             kubernetes_metrics=kubernetes_metrics,
             error_summary=error_summary,
+            error_logs=error_logs,
             resource_trends=resource_trends,
             focus_areas=", ".join(focus_areas) if focus_areas else "comprehensive cluster health",
             timeframe=timeframe

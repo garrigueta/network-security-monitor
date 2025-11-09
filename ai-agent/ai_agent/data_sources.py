@@ -133,6 +133,120 @@ class DataCollector:
         
         return logs[:limit] if limit else logs
     
+    async def get_kubernetes_logs(self, hours: int = 24, limit: int = 500, 
+                                   namespace: str = None, 
+                                   level: str = None) -> List[Dict[str, Any]]:
+        """Get Kubernetes pod logs from Loki (errors, warnings, container issues)"""
+        operation_start = time.time()
+        logs = []
+        
+        ActionLogger.log_data_collection(
+            logger,
+            source="kubernetes",
+            action="get_logs",
+            status="started",
+            hours=hours,
+            limit=limit,
+            namespace=namespace,
+            level=level
+        )
+        
+        try:
+            # Calculate time range
+            end_time = datetime.now()
+            start_time = end_time - timedelta(hours=hours)
+            
+            # Convert to nanoseconds (Loki format)
+            start_ns = int(start_time.timestamp() * 1_000_000_000)
+            end_ns = int(end_time.timestamp() * 1_000_000_000)
+            
+            # Build Loki query - get logs from all pods in network-security namespace
+            # Filter for error, warn, fatal levels and container issues
+            query_filters = ['{job="ai-agent"}']
+            
+            if namespace:
+                query_filters.append(f'namespace="{namespace}"')
+            
+            if level:
+                query_filters.append(f'level=~"{level}"')
+            else:
+                # Default: get error, warn, fatal levels + container crash/restart events
+                query_filters.append('level=~"error|warn|fatal|ERROR|WARN|FATAL"')
+            
+            query = '{' + ', '.join(query_filters) + '}'
+            # Also add regex filter for common error patterns
+            query += ' |~ "(?i)(error|failed|crash|oom|restart|killed|exception|fatal|panic|backoff)"'
+            
+            url = f"{settings.loki_url}/loki/api/v1/query_range"
+            
+            params = {
+                "query": query,
+                "start": start_ns,
+                "end": end_ns,
+                "limit": limit,
+                "direction": "backward"
+            }
+            
+            response = await self.http_client.get(url, params=params)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if data.get("status") == "success" and data.get("data", {}).get("result"):
+                for stream in data["data"]["result"]:
+                    stream_labels = stream.get("stream", {})
+                    for entry in stream.get("values", []):
+                        timestamp, log_line = entry
+                        try:
+                            # Try to parse as JSON
+                            log_data = json.loads(log_line)
+                            log_data["timestamp"] = timestamp
+                            log_data["stream_labels"] = stream_labels
+                            logs.append(log_data)
+                        except json.JSONDecodeError:
+                            # Fallback for non-JSON logs
+                            logs.append({
+                                "timestamp": timestamp,
+                                "message": log_line,
+                                "stream_labels": stream_labels,
+                                "raw": True
+                            })
+                
+                ActionLogger.log_data_collection(
+                    logger,
+                    source="loki",
+                    action="get_kubernetes_logs",
+                    status="completed",
+                    records_count=len(logs)
+                )
+            else:
+                logger.warning("No Kubernetes logs found in Loki", query=query)
+            
+        except Exception as e:
+            ActionLogger.log_data_collection(
+                logger,
+                source="loki",
+                action="get_kubernetes_logs",
+                status="failed",
+                error=str(e)
+            )
+            logger.error(f"Failed to get Kubernetes logs from Loki: {e}")
+        
+        duration_ms = (time.time() - operation_start) * 1000
+        final_count = len(logs)
+        
+        ActionLogger.log_data_collection(
+            logger,
+            source="kubernetes",
+            action="get_logs",
+            status="completed",
+            records_count=final_count,
+            duration_ms=duration_ms,
+            hours=hours
+        )
+        
+        return logs
+    
     async def get_prometheus_metrics(self, metric: str, duration: str = "1h") -> Dict[str, Any]:
         """Get metrics from Prometheus"""
         start_time = time.time()

@@ -324,13 +324,32 @@ class AIEngine:
             hours = self._timeframe_to_hours(timeframe)
             k8s_metrics = await self.data_collector.get_kubernetes_metrics(hours=hours)
             
+            # Get Kubernetes error logs from Loki
+            k8s_logs = await self.data_collector.get_kubernetes_logs(
+                hours=hours, 
+                limit=200,
+                namespace="network-security"
+            )
+            
+            # Categorize logs by severity and type
+            error_logs = {
+                "errors": [log for log in k8s_logs if any(term in str(log).lower() for term in ["error", "failed", "exception"])],
+                "oom_kills": [log for log in k8s_logs if any(term in str(log).lower() for term in ["oom", "out of memory", "killed"])],
+                "crashes": [log for log in k8s_logs if any(term in str(log).lower() for term in ["crash", "panic", "fatal"])],
+                "restarts": [log for log in k8s_logs if any(term in str(log).lower() for term in ["restart", "backoff", "crashloop"])],
+            }
+            
             # Process and summarize error metrics
             error_summary = {
                 "oom_events": self._count_metric_values(k8s_metrics["errors"].get("oom_events", {})),
                 "memory_failures": self._count_metric_values(k8s_metrics["errors"].get("memory_failures", {})),
                 "network_rx_errors": self._count_metric_values(k8s_metrics["errors"].get("network_rx_errors", {})),
                 "network_tx_errors": self._count_metric_values(k8s_metrics["errors"].get("network_tx_errors", {})),
-                "scrape_errors": self._count_metric_values(k8s_metrics["errors"].get("scrape_errors", {}))
+                "scrape_errors": self._count_metric_values(k8s_metrics["errors"].get("scrape_errors", {})),
+                "log_errors": len(error_logs["errors"]),
+                "log_oom_kills": len(error_logs["oom_kills"]),
+                "log_crashes": len(error_logs["crashes"]),
+                "log_restarts": len(error_logs["restarts"])
             }
             
             # Process resource usage metrics
@@ -345,11 +364,20 @@ class AIEngine:
                 }
             }
             
+            # Prepare sample error logs for analysis (limit to avoid token overflow)
+            sample_error_logs = {
+                "recent_errors": error_logs["errors"][:10],
+                "oom_examples": error_logs["oom_kills"][:5],
+                "crash_examples": error_logs["crashes"][:5],
+                "restart_examples": error_logs["restarts"][:5]
+            }
+            
             # Create comprehensive analysis prompt
             prompt = prompt_templates.get_kubernetes_health_prompt(
                 kubernetes_metrics=json.dumps(k8s_metrics, indent=2),
                 error_summary=json.dumps(error_summary, indent=2),
                 resource_trends=json.dumps(resource_summary, indent=2),
+                error_logs=json.dumps(sample_error_logs, indent=2, default=str),
                 focus_areas=focus_areas or ["cluster_health", "error_analysis", "capacity_planning"],
                 timeframe=timeframe
             )
@@ -378,6 +406,11 @@ class AIEngine:
                     "errors": error_summary,
                     "resources": resource_summary,
                     "collection_time": k8s_metrics.get("collection_time")
+                },
+                "error_logs": {
+                    "total_errors": len(k8s_logs),
+                    "by_category": {k: len(v) for k, v in error_logs.items()},
+                    "samples": sample_error_logs
                 },
                 "raw_data": k8s_metrics,
                 "focus_areas": focus_areas or ["cluster_health"]

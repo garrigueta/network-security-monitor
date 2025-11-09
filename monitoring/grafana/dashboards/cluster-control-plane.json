@@ -608,7 +608,7 @@
       "type": "logs"
     },
     {
-      "description": "AI-powered analysis of cluster health, errors, and operational recommendations. Report generated daily at 9 AM or on-demand.",
+      "description": "AI-powered analysis of cluster health, pod/container errors, and operational recommendations. Report generated every 3 hours at :00 (0:00, 3:00, 6:00, 9:00, 12:00, 15:00, 18:00, 21:00) or on-demand.",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -626,7 +626,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "<iframe src=\"http://192.168.1.136:8080/reports/latest/analysis-html\" width=\"100%\" height=\"800px\" style=\"border: none; border-radius: 4px;\"></iframe>",
+        "content": "<iframe src=\"http://192.168.1.136:8080/reports/latest/html/kubernetes\" width=\"100%\" height=\"800px\" style=\"border: none; border-radius: 4px;\"></iframe>",
         "mode": "html"
       },
       "pluginVersion": "12.2.1",
