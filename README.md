@@ -59,9 +59,9 @@ The platform operates in three integrated layers:
 **3. Analysis and Visualization Layer**
 - Grafana dashboards provide real-time views of security events, network
   patterns, and system health
-- AI Agent (OpenAI-powered) analyzes aggregated logs to identify threats,
+- AI Agent (Ollama-powered) analyzes aggregated logs to identify threats,
   generate security reports, and provide natural language insights
-- Scheduled reports run every 5 hours, with on-demand API access available
+- Scheduled reports run every 3-6 hours, with on-demand API access available
 
 ## Components
 
@@ -69,11 +69,11 @@ The platform consists of nine integrated services:
 
 - **Zeek** - Network traffic analyzer capturing detailed protocol logs
 - **Heralding** - Multi-protocol honeypot (SSH, Telnet, FTP, HTTP)
-- **Grafana** - Visualization platform with 10 pre-built dashboards
+- **Grafana** - Visualization platform with 3 pre-built dashboards
 - **Prometheus** - Metrics collection and time-series database
 - **Loki** - Log aggregation system for centralized log storage
 - **Promtail** - Log shipping agent for Zeek and honeypot logs
-- **AI Agent** - OpenAI-powered threat analysis and report generation
+- **AI Agent** - Ollama-powered threat analysis and report generation
 - **Node Exporter** - System and hardware metrics exporter
 - **Crypto Exporter** - Cryptocurrency price tracking (optional)
 
@@ -136,14 +136,9 @@ kubectl get svc -n network-security
 Access Grafana at `http://<NODE_IP>:3000` (default credentials: admin/admin)
 
 Available dashboards:
-- **Zeek Security Overview** - Network traffic patterns and threats
-- **Zeek Connection Analysis** - Detailed connection tracking
-- **Zeek DNS Security Analysis** - DNS query monitoring
-- **Zeek SSL/TLS Analysis** - Certificate and encryption analysis
-- **Honeypot Attack Overview** - Brute force and intrusion attempts
-- **AI Security Reports** - Automated threat intelligence
-- **SSD I/O Monitoring** - Storage performance metrics
-- **SSD Storage Monitoring** - Disk usage and capacity
+- **Executive Security Dashboard** - High-level security metrics with AI executive reports
+- **Network Security Analysis** - Zeek event visualization with AI network security reports
+- **Cluster Control Plane** - Kubernetes health monitoring and cluster metrics
 
 ### AI Agent API
 

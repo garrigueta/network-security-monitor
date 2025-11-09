@@ -36,6 +36,8 @@ spec:
         env:
         - name: ZEEK_INTERFACE
           value: {{ .Values.zeek.interface }}
+        - name: ZEEK_LOG_DIR
+          value: /mnt/ssd-logs/zeek
         securityContext:
           capabilities:
             add:
@@ -44,6 +46,9 @@ spec:
         volumeMounts:
         - name: logs
           mountPath: /mnt/ssd-logs/zeek
+        - name: logs
+          mountPath: /mnt/zeek-logs
+          subPath: zeek-internal
         - name: config
           mountPath: /usr/local/zeek/share/zeek/site/local.zeek
           subPath: local.zeek

@@ -135,14 +135,22 @@ class ReportGenerator:
             # Generate report content based on level and focus
             if is_kubernetes_report:
                 # Generate Kubernetes-specific report
+                metadata.tags.append("kubernetes")
+                metadata.title = f"{level.value.title()} Kubernetes Cluster Health Report"
                 content = await self._generate_kubernetes_report(metadata, focus_areas)
             elif level == ReportLevel.EXECUTIVE:
+                # Network security focused report
+                metadata.tags.append("network_security")
+                metadata.title = f"{level.value.title()} Network Security Report"
                 content = await self._generate_executive_report(metadata, focus_areas)
             elif level == ReportLevel.TECHNICAL:
+                metadata.tags.append("network_security")
                 content = await self._generate_technical_report(metadata, focus_areas)
             elif level == ReportLevel.DETAILED:
+                metadata.tags.append("network_security")
                 content = await self._generate_detailed_report(metadata, focus_areas)
             elif level == ReportLevel.REAL_TIME:
+                metadata.tags.append("network_security")
                 content = await self._generate_realtime_alert(metadata, focus_areas)
             else:
                 raise ValueError(f"Unsupported report level: {level}")

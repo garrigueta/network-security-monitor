@@ -139,8 +139,13 @@ data:
               - localhost
             labels:
               job: zeek
-              __path__: /mnt/ssd-logs/zeek/logs/current/*.log
+              __path__: /mnt/ssd-logs/zeek/zeek-internal/spool/zeek/*.log
         pipeline_stages:
+          - regex:
+              expression: '.*/(?P<log_type>[^/]+)\.log'
+              source: filename
+          - labels:
+              log_type:
           - json:
               expressions:
                 ts: ts

@@ -79,15 +79,15 @@ class ReportScheduler:
             period_hours = 1
             
         elif frequency == ReportFrequency.DAILY:
-            # Stagger daily reports to avoid simultaneous execution
+            # Stagger reports with higher frequency for better monitoring
             if level == ReportLevel.EXECUTIVE:
-                # Executive reports once daily at 8 AM
-                trigger = CronTrigger(hour=8, minute=0)
-                period_hours = 24
+                # Executive reports every 4 hours at :30 (0:30, 4:30, 8:30, 12:30, 16:30, 20:30)
+                trigger = CronTrigger(hour='*/4', minute=30)
+                period_hours = 4
             elif level == ReportLevel.TECHNICAL:
-                # Technical reports once daily at 2 PM (6 hours after Executive)
-                trigger = CronTrigger(hour=14, minute=0)
-                period_hours = 24
+                # Technical reports every 6 hours at :45 (0:45, 6:45, 12:45, 18:45)
+                trigger = CronTrigger(hour='*/6', minute=45)
+                period_hours = 6
             elif level == ReportLevel.DETAILED:
                 # Detailed reports once daily at 10 PM
                 trigger = CronTrigger(hour=22, minute=0)
@@ -197,6 +197,22 @@ class ReportScheduler:
             
         except Exception as e:
             logger.error(f"Failed to generate Kubernetes health report: {e}")
+    
+    async def _generate_network_security_report(self):
+        """Generate scheduled network security report"""
+        try:
+            logger.info("Generating scheduled network security report")
+            
+            report = await self.report_generator.generate_report(
+                level=ReportLevel.EXECUTIVE,
+                period_hours=24,
+                focus_areas=["network_security", "zeek_analysis", "threat_detection"]
+            )
+            
+            logger.info(f"Successfully generated network security report: {report.metadata.id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to generate network security report: {e}")
     
     async def trigger_manual_report(self, level: ReportLevel, period_hours: int = 24) -> str:
         """Manually trigger report generation"""

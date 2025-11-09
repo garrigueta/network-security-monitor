@@ -72,14 +72,27 @@ async def lifespan(app: FastAPI):
     )
     await app.state.report_scheduler.start()
     
-    # Schedule daily Kubernetes cluster health report (9 AM)
+    # Schedule Kubernetes cluster health report (every 3 hours at :00)
+    # Runs at 0:00, 3:00, 6:00, 9:00, 12:00, 15:00, 18:00, 21:00
     app.state.report_scheduler.scheduler.add_job(
         app.state.report_scheduler._generate_kubernetes_health_report,
         trigger='cron',
-        hour=9,
+        hour='*/3',
         minute=0,
-        id='kubernetes_health_daily',
-        name='Daily Kubernetes Cluster Health Report',
+        id='kubernetes_health_regular',
+        name='Kubernetes Cluster Health Report (every 3h at :00)',
+        misfire_grace_time=3600
+    )
+    
+    # Schedule network security report (every 3 hours at :15)
+    # Runs at 0:15, 3:15, 6:15, 9:15, 12:15, 15:15, 18:15, 21:15
+    app.state.report_scheduler.scheduler.add_job(
+        app.state.report_scheduler._generate_network_security_report,
+        trigger='cron',
+        hour='*/3',
+        minute=15,
+        id='network_security_regular',
+        name='Network Security Report (every 3h at :15)',
         misfire_grace_time=3600
     )
     
@@ -711,141 +724,6 @@ async def get_latest_report():
     return latest_report
 
 
-@app.get("/reports/latest/analysis-html", response_class=HTMLResponse)
-async def get_latest_analysis_html():
-    """Return the latest AI analysis as formatted HTML (public endpoint for Grafana iframe)"""
-    import markdown
-    
-    reports_dir = Path(settings.reports_dir)
-
-    if not reports_dir.exists():
-        return HTMLResponse("<p>No reports available</p>")
-
-    latest_report = None
-    latest_created_ts: Optional[float] = None
-
-    for report_file in reports_dir.glob("*.json"):
-        try:
-            with open(report_file, "r") as f:
-                report_data = json.load(f)
-        except Exception as e:
-            continue
-
-        metadata = report_data.get("metadata", {})
-        created_raw = metadata.get("created_at")
-        file_mtime = report_file.stat().st_mtime
-
-        created_ts: float
-        if isinstance(created_raw, str):
-            iso_value = created_raw.replace("Z", "+00:00")
-            try:
-                parsed_dt = datetime.fromisoformat(iso_value)
-                if parsed_dt.tzinfo is None:
-                    parsed_dt = parsed_dt.replace(tzinfo=timezone.utc)
-                created_ts = parsed_dt.timestamp()
-            except ValueError:
-                created_ts = file_mtime
-        else:
-            created_ts = file_mtime
-
-        if latest_created_ts is None or created_ts > latest_created_ts:
-            latest_created_ts = created_ts
-            latest_report = report_data
-
-    if latest_report is None:
-        styled_html = """
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="UTF-8"><title>AI Analysis</title></head>
-        <body style="font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #181B1F;">
-            <div style="background: #1F2329; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); color: #D8DEE9;">
-                <h2 style="color: #BF616A; margin-top: 0;">⚠️ No Reports Available</h2>
-                <p>No security reports have been generated yet. Trigger a report generation to see AI analysis here.</p>
-            </div>
-        </body>
-        </html>
-        """
-        return HTMLResponse(content=styled_html)
-
-    ai_analysis = latest_report.get("ai_analysis", "No analysis available")
-    
-    # Check if analysis is empty or an error
-    if not ai_analysis or len(ai_analysis.strip()) < 10:
-        ai_analysis = "⚠️ **Report generated but AI analysis is empty or failed.**\n\nThis may be due to a timeout or connection issue with the AI model."
-    
-    # Convert markdown to HTML
-    html_content = markdown.markdown(ai_analysis, extensions=['extra', 'nl2br', 'tables'])
-    
-    # Get report metadata for header
-    metadata = latest_report.get("metadata", {})
-    report_title = metadata.get("title", "AI Security Analysis")
-    created_at = metadata.get("created_at", "Unknown")
-    
-    # Wrap in styled HTML with full document structure (dark theme)
-    styled_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>AI Security Analysis</title>
-        <style>
-            body {{
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                margin: 0;
-                padding: 20px;
-                background: #181B1F;
-                color: #D8DEE9;
-                line-height: 1.8;
-            }}
-            .container {{
-                background: #1F2329;
-                padding: 30px;
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                max-width: 1200px;
-                margin: 0 auto;
-            }}
-            h1, h2, h3, h4 {{
-                color: #6E9ECF;
-                margin-top: 1.5em;
-            }}
-            h1 {{ font-size: 2em; border-bottom: 3px solid #4C9AFF; padding-bottom: 10px; }}
-            h2 {{ font-size: 1.6em; border-bottom: 2px solid #3A3F47; padding-bottom: 8px; }}
-            h3 {{ font-size: 1.3em; color: #88C0D0; }}
-            p {{ margin: 1em 0; }}
-            ul, ol {{ margin: 1em 0; padding-left: 2em; }}
-            li {{ margin: 0.5em 0; }}
-            code {{ background: #2E3440; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; color: #A3BE8C; }}
-            pre {{ background: #2E3440; color: #D8DEE9; padding: 15px; border-radius: 5px; overflow-x: auto; border: 1px solid #434C5E; }}
-            .meta {{ color: #81A1C1; font-size: 0.9em; margin-bottom: 20px; padding: 10px; background: #2E3440; border-radius: 4px; border-left: 3px solid #5E81AC; }}
-            strong {{ color: #88C0D0; }}
-            hr {{ border: none; border-top: 1px solid #3A3F47; margin: 2em 0; }}
-            table {{ border-collapse: collapse; width: 100%; margin: 1em 0; }}
-            th, td {{ border: 1px solid #3A3F47; padding: 12px; text-align: left; }}
-            th {{ background-color: #5E81AC; color: #ECEFF4; }}
-            tr:nth-child(even) {{ background-color: #242933; }}
-            a {{ color: #88C0D0; }}
-            a:hover {{ color: #5E81AC; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🔒 {report_title}</h1>
-            <div class="meta">
-                <strong>Generated:</strong> {created_at}<br>
-                <strong>Report ID:</strong> {metadata.get('id', 'N/A')}
-            </div>
-            <hr>
-            {html_content}
-        </div>
-    </body>
-    </html>
-    """
-    
-    return HTMLResponse(content=styled_html)
-
-
 @app.get("/reports/{report_id}")
 async def get_report(report_id: str, _: bool = Depends(verify_api_key)):
     """Get a specific report"""
@@ -896,6 +774,124 @@ async def export_report(
     except Exception as e:
         logger.error(f"Error exporting report: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/reports/latest/html/{report_type}", response_class=HTMLResponse)
+async def get_latest_report_html_by_type(report_type: str):
+    """Get latest report HTML filtered by type (kubernetes or network_security)"""
+    import markdown
+    
+    reports_dir = Path(settings.reports_dir)
+    if not reports_dir.exists():
+        return HTMLResponse("<p>No reports available</p>")
+
+    latest_report = None
+    latest_created_ts: Optional[float] = None
+
+    for report_file in reports_dir.glob("*.json"):
+        try:
+            with open(report_file, "r") as f:
+                report_data = json.load(f)
+        except Exception:
+            continue
+
+        # Filter by report type based on tags, title, or level
+        metadata = report_data.get("metadata", {})
+        tags = metadata.get("tags", [])
+        title = metadata.get("title", "").lower()
+        level = metadata.get("level", "").lower()
+        
+        # Check if this report matches the requested type (mutually exclusive)
+        is_match = False
+        if report_type == "kubernetes" and "kubernetes" in tags:
+            is_match = True
+        elif report_type == "network_security" and ("zeek_analysis" in tags or "threat_detection" in tags):
+            is_match = True
+        elif report_type == "executive" and level == "executive" and "kubernetes" not in tags and "zeek_analysis" not in tags:
+            is_match = True
+        
+        if not is_match:
+            continue
+
+        created_raw = metadata.get("created_at")
+        file_mtime = report_file.stat().st_mtime
+
+        created_ts: float
+        if isinstance(created_raw, str):
+            iso_value = created_raw.replace("Z", "+00:00")
+            try:
+                parsed_dt = datetime.fromisoformat(iso_value)
+                if parsed_dt.tzinfo is None:
+                    parsed_dt = parsed_dt.replace(tzinfo=timezone.utc)
+                created_ts = parsed_dt.timestamp()
+            except ValueError:
+                created_ts = file_mtime
+        else:
+            created_ts = file_mtime
+
+        if latest_created_ts is None or created_ts > latest_created_ts:
+            latest_created_ts = created_ts
+            latest_report = report_data
+
+    if latest_report is None:
+        styled_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="UTF-8"><title>AI Analysis</title></head>
+        <body style="font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #181B1F;">
+            <div style="background: #1F2329; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); color: #D8DEE9;">
+                <h2 style="color: #BF616A; margin-top: 0;">⚠️ No {report_type.replace('_', ' ').title()} Reports Available</h2>
+                <p>No {report_type.replace('_', ' ')} reports have been generated yet.</p>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=styled_html)
+
+    ai_analysis = latest_report.get("ai_analysis", "No analysis available")
+    
+    if not ai_analysis or len(ai_analysis.strip()) < 10:
+        ai_analysis = "⚠️ **Report generated but AI analysis is empty or failed.**"
+    
+    html_content = markdown.markdown(ai_analysis, extensions=['extra', 'nl2br', 'tables'])
+    
+    metadata = latest_report.get("metadata", {})
+    report_title = metadata.get("title", "AI Security Analysis")
+    created_at = metadata.get("created_at", "Unknown")
+    
+    styled_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>{report_title}</title>
+        <style>
+            body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #181B1F; color: #D8DEE9; line-height: 1.8; }}
+            .container {{ max-width: 1200px; margin: 0 auto; background: #1F2329; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }}
+            h1, h2, h3 {{ color: #88C0D0; margin-top: 1.5em; }}
+            h1 {{ border-bottom: 2px solid #5E81AC; padding-bottom: 10px; }}
+            a {{ color: #88C0D0; text-decoration: none; }} a:hover {{ color: #81A1C1; }}
+            code {{ background: #2E3440; padding: 2px 6px; border-radius: 3px; color: #A3BE8C; }}
+            pre {{ background: #2E3440; padding: 15px; border-radius: 5px; overflow-x: auto; }}
+            table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+            th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #4C566A; }}
+            th {{ background: #2E3440; font-weight: bold; color: #88C0D0; }}
+            .report-header {{ color: #EBCB8B; font-size: 0.9em; margin-bottom: 20px; padding: 10px; background: #2E3440; border-radius: 5px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="report-header">
+                <strong>{report_title}</strong><br>
+                Generated: {created_at}<br>
+                Type: {report_type.replace('_', ' ').title()}
+            </div>
+            {html_content}
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=styled_html)
 
 
 @app.get("/reports/schedule/status")
